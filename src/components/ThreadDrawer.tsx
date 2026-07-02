@@ -16,7 +16,7 @@ function displayText(content: string): string {
 }
 
 export default function ThreadDrawer() {
-  const { threadOpen, toggleThread, thread, folder, activePath, setSource } = useStore()
+  const { threadOpen, toggleThread, thread, folder, activePath } = useStore()
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -35,8 +35,7 @@ export default function ThreadDrawer() {
     if (!activePath) return
     try {
       const content = await window.clipot.readFile(cp.path)
-      setSource(content)
-      await window.clipot.writeFile(activePath, content)
+      useStore.getState().rollbackTo(content)
       setError(null)
     } catch {
       setError('Failed to roll back to that checkpoint.')

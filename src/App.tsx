@@ -34,7 +34,7 @@ export default function App() {
           <Toolbar onOpenRules={() => setRulesOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
           {mode === 'new' ? <NewFileView /> : <CanvasView />}
           <ActivityStrip />
-          <PromptBar />
+          {mode !== 'new' && <PromptBar />}
         </div>
       </div>
       <ThreadDrawer />

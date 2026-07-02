@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import { Send } from 'lucide-react'
 import { useStore } from '@/store/store'
+import { joinPath } from '@/lib/path'
 import logoUrl from '../../assets/logo.svg'
-
-function joinPath(dir: string, name: string): string {
-  const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/'
-  return `${dir}${sep}${name}`
-}
 
 export default function NewFileView() {
   const { folder, streaming, sendPrompt, openFile } = useStore()

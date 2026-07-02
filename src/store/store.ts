@@ -76,6 +76,7 @@ type State = {
   removeSelection(n: number): void
   revalidateSelections(): void
   setSource(s: string): void
+  rollbackTo(content: string): void
   setModel(provider: ProviderId, model: string): void
   setRules(r: string): void
   toggleRegionMode(): void
@@ -120,6 +121,14 @@ export const useStore = create<State>((set, get) => ({
     set({ selections: revalidate(get().source, get().selections) })
   },
   setSource(s) { set({ source: s }) },
+  rollbackTo(content) {
+    debouncedWrite.cancel() // drop any pending autosave for content we're discarding
+    undo = createUndoStack(content)
+    set({ source: content })
+    get().revalidateSelections()
+    const ap = get().activePath
+    if (ap) void writeSource(ap, content, set)
+  },
   setModel(provider, model) { set({ provider, model }) },
   setRules(r) { set({ rules: r }) },
   toggleRegionMode() { set((s) => ({ regionMode: !s.regionMode })) },

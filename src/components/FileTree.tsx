@@ -2,18 +2,13 @@ import { useEffect, useState, type MouseEvent } from 'react'
 import { ChevronRight, ChevronDown, FileCode, FolderPlus, FilePlus, FolderOpen } from 'lucide-react'
 import type { TreeNode } from '../../electron/shared/ipc'
 import { useStore } from '@/store/store'
+import { joinPath } from '@/lib/path'
 
 const EMPTY_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>'
 
 function dirOf(path: string): string {
   const idx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   return idx === -1 ? '' : path.slice(0, idx)
-}
-
-function joinPath(dir: string, name: string): string {
-  if (!dir) return name
-  const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/'
-  return `${dir}${sep}${name}`
 }
 
 type MenuAction = 'rename' | 'duplicate' | 'delete' | 'newFile' | 'newFolder'
