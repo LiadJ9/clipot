@@ -10,6 +10,10 @@ clipot is a desktop app for managing a folder of SVG files and editing them thro
 
 Everything is local-first: your SVGs live on disk in a folder you choose, edits are written straight to those files, and history/chat state is stored alongside them in a plain `.clipot/` directory. clipot is provider-agnostic — it talks to Anthropic, OpenAI, and Google Gemini over their HTTP APIs, and to a local Ollama install for fully offline use, with no other backend or account required.
 
+## Screenshots
+
+> _Screenshots coming soon._
+
 ## Features
 
 - **Folder sidebar** — open any folder of SVGs; create, rename, move (drag-and-drop), duplicate, and delete files and folders from a context menu.
@@ -22,10 +26,6 @@ Everything is local-first: your SVGs live on disk in a folder you choose, edits 
 - **Per-file chat threads & prompt checkpoints** — every file keeps its own persisted conversation, and every prompt run snapshots the file first so you can roll back from the thread drawer.
 - **Editable rules** — a rules text (with sensible defaults) is appended to every request; override it per project.
 - **Orange-on-near-black UI** — a dedicated dark theme with Space Grotesk and JetBrains Mono, bundled locally.
-
-## Screenshots
-
-> _Screenshots coming soon._
 
 ## Installation
 
