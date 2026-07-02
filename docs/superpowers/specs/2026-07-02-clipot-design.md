@@ -92,7 +92,7 @@ Core renderer modules (pure logic, unit-testable): `svgDoc`, `editStream`, `prom
 - **Stable IDs:** on first selection of an element without an id, clipot writes `id="clipot-N"` into the file (N = max existing clipot-id + 1). All LLM references use ids. After every applied edit, selections are re-validated; a selection whose id disappeared flips its bubble to a warning state.
 - **Region select:** drag a rectangle over the canvas. Resolves to all elements whose rendered bounds intersect the region (always), plus a rasterized PNG crop of the region attached to the message when the active model supports vision (capability map; Anthropic/OpenAI/Gemini models yes, Ollama per settings toggle). Text-only models silently skip the image.
 - **Rules:** an editable text (default shipped with the app, per-folder override in `.clipot/rules.md`) appended to the system prompt on every request. Default rules: produce distinct, well-separated elements with meaningful `id`s; keep structure human-readable; never remove or rename existing `id`s; prefer minimal edits over rewrites.
-- **Message assembly (`promptBuilder`):** system = edit-protocol spec + rules; user = prompt text with each `@n` expanded to the element's id + source, region element list, optional image block, current full SVG source (with a size cap; beyond it, only mentioned elements + document skeleton).
+- **Message assembly (`promptBuilder`):** system = edit-protocol spec + rules; user = prompt text with each `@n` expanded to the element's id + source, region element list, optional image block, current full SVG source when ≤32 KB; above that, only the mentioned elements' source plus the document skeleton (root attributes + top-level structure).
 
 ## 6. Edit protocol, live apply, history
 
@@ -117,7 +117,7 @@ REPLACE:
 - Undo/redo: in-memory source snapshots, one per applied edit block; toolbar + Ctrl+Z/Ctrl+Shift+Z.
 - Prompt checkpoints: before each run, the current file is snapshotted to `.clipot/history/<file>/NNN-<prompt-slug>.svg`; restorable from the thread drawer, survives restarts.
 - Duplicate: copies the file next to the original.
-- Threads: per-file conversation persisted at `.clipot/threads/<file>.json`; prior turns sent as context (token-budget trimmed).
+- Threads: per-file conversation persisted at `.clipot/threads/<file>.json`; most recent turns sent as context, oldest dropped first past a ~8k-token budget.
 - `.clipot/` is created inside the opened folder; the README recommends gitignoring it.
 
 ## 7. Providers
