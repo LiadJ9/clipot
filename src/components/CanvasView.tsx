@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store/store'
 import { ensureId } from '@/lib/svgDoc'
-import { labelFor } from '@/lib/selection'
+import { labelFor, type Selection } from '@/lib/selection'
 
 type Bubble = { n: number; x: number; y: number }
 
-function sanitize(root: SVGSVGElement) {
+export function sanitize(root: SVGSVGElement) {
   root.querySelectorAll('script').forEach((n) => n.remove())
-  root.querySelectorAll('*').forEach((el) => {
+  for (const el of [root, ...Array.from(root.querySelectorAll('*'))]) {
     for (const a of Array.from(el.attributes)) if (a.name.startsWith('on')) el.removeAttribute(a.name)
-  })
+  }
 }
 
 function pathTo(root: Element, el: Element): number[] {
@@ -50,14 +50,17 @@ export default function CanvasView() {
   const hostRef = useRef<HTMLDivElement>(null)
   const [bubbles, setBubbles] = useState<Bubble[]>([])
 
+  // Rebuild the DOM from source, wire clicks, highlight selections in place,
+  // and position bubbles — all in one pass so there's no stale state to clean up.
   useEffect(() => {
     const host = hostRef.current
+    const wrap = wrapRef.current
     if (!host) return
     host.innerHTML = ''
-    if (!source) return
+    if (!source) { setBubbles([]); return }
     const doc = new DOMParser().parseFromString(source, 'image/svg+xml')
     const root = doc.documentElement as unknown as SVGSVGElement
-    if (root.tagName.toLowerCase() !== 'svg') return
+    if (root.tagName.toLowerCase() !== 'svg') { setBubbles([]); return }
     sanitize(root)
     host.appendChild(root)
 
@@ -65,43 +68,35 @@ export default function CanvasView() {
       const target = e.target as Element
       if (target === root) return
       e.stopPropagation()
-      const existing = target.id ? useStore.getState().selections.find((s) => s.id === target.id) : undefined
-      if (existing) { removeSelection(existing.n); return }
+      let matched: Selection | undefined
+      let cur: Element | null = target
+      while (cur && cur !== root) {
+        if (cur.id) {
+          matched = selections.find((s) => s.id === cur!.id)
+          if (matched) break
+        }
+        cur = cur.parentElement
+      }
+      if (matched) { removeSelection(matched.n); return }
       const p = pathTo(root, target)
       const { source: next, id } = ensureId(source, p)
       if (next !== source) setSource(next)
       addSelection(id, labelFor(next, id))
     }
     root.addEventListener('click', onClick)
-    return () => root.removeEventListener('click', onClick)
-  }, [source, addSelection, removeSelection, setSource])
 
-  // overlay: re-mark selected elements each render
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-    const root = host.querySelector('svg')
-    if (!root) return
-    root.querySelectorAll('[data-clipot-overlay]').forEach((n) => n.remove())
-    selections.forEach((s) => {
+    for (const s of selections) {
+      if (s.stale) continue
       const el = root.querySelector(`#${CSS.escape(s.id)}`)
-      if (!el) return
-      const clone = el.cloneNode(true) as SVGElement
-      clone.setAttribute('data-clipot-overlay', '1')
-      clone.setAttribute('stroke', '#fff')
-      clone.setAttribute('stroke-width', '2')
-      clone.setAttribute('style', 'filter: drop-shadow(0 0 4px rgba(255,255,255,.9))')
-      root.appendChild(clone)
-    })
-  }, [selections, source])
+      if (!el) continue
+      el.setAttribute('stroke', '#fff')
+      el.setAttribute('stroke-width', '2')
+      el.setAttribute('style', 'filter: drop-shadow(0 0 4px rgba(255,255,255,.9))')
+      el.parentNode?.appendChild(el)
+    }
 
-  // numbered bubbles: position an HTML badge over each selected element's bbox
-  useEffect(() => {
-    const recompute = () => {
-      const host = hostRef.current
-      const wrap = wrapRef.current
-      const root = host?.querySelector('svg') ?? null
-      if (!host || !wrap || !root) { setBubbles([]); return }
+    const recomputeBubbles = () => {
+      if (!wrap) { setBubbles([]); return }
       const wrapRect = wrap.getBoundingClientRect()
       const next: Bubble[] = []
       for (const s of selections) {
@@ -111,10 +106,14 @@ export default function CanvasView() {
       }
       setBubbles(next)
     }
-    recompute()
-    window.addEventListener('resize', recompute)
-    return () => window.removeEventListener('resize', recompute)
-  }, [selections, source])
+    recomputeBubbles()
+    window.addEventListener('resize', recomputeBubbles)
+
+    return () => {
+      root.removeEventListener('click', onClick)
+      window.removeEventListener('resize', recomputeBubbles)
+    }
+  }, [source, selections, addSelection, removeSelection, setSource])
 
   return (
     <div className="canvas-wrap" data-testid="canvas" ref={wrapRef}>
