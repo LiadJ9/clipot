@@ -1,5 +1,6 @@
 import type { TreeNode } from '../services/files'
 import type { ProviderId } from '../services/vault'
+import type { LlmMessage } from '../services/llm/types'
 
 export type ThreadMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -22,6 +23,12 @@ export const CH = {
   loadThread: 'history:loadThread',
   saveThread: 'history:saveThread',
   loadRules: 'history:loadRules',
+  llmStart: 'llm:start',
+  llmStop: 'llm:stop',
+  llmChunk: 'llm:chunk',
+  llmDone: 'llm:done',
+  llmError: 'llm:error',
+  listModels: 'llm:listModels',
 } as const
 
 export interface ClipotApi {
@@ -43,6 +50,11 @@ export interface ClipotApi {
   loadThread(folder: string, filePath: string): Promise<ThreadMessage[]>
   saveThread(folder: string, filePath: string, messages: ThreadMessage[]): Promise<void>
   loadRules(folder: string): Promise<string | null>
+  startStream(
+    args: { provider: ProviderId; model: string; messages: LlmMessage[] },
+    handlers: { onChunk: (text: string) => void; onDone: () => void; onError: (message: string) => void }
+  ): () => void
+  listModels(provider: ProviderId): Promise<string[]>
 }
 
 declare global {

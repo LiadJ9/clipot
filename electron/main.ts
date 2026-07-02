@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
+import type { WebContents } from 'electron'
 import { join } from 'node:path'
 import chokidar from 'chokidar'
 import { CH } from './shared/ipc'
@@ -6,6 +7,9 @@ import type { ThreadMessage } from './shared/ipc'
 import * as files from './services/files'
 import * as vault from './services/vault'
 import * as history from './services/history'
+import { PROVIDERS as LLM_PROVIDERS } from './services/llm'
+import { listOllamaModels } from './services/llm/ollama'
+import type { LlmMessage } from './services/llm/types'
 import type { ProviderId } from './services/vault'
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL
@@ -16,9 +20,45 @@ const ENV_VAR: Record<ProviderId, string> = {
   gemini: 'GEMINI_API_KEY',
   ollama: 'OLLAMA_HOST',
 }
+const OLLAMA_DEFAULT_HOST = 'http://localhost:11434'
+const CURATED_MODELS: Partial<Record<ProviderId, string[]>> = {
+  anthropic: ['claude-sonnet-5', 'claude-opus-4-8'],
+  openai: ['gpt-5.2', 'gpt-5.1'],
+  gemini: ['gemini-3.0-pro', 'gemini-2.5-flash'],
+}
 
 let watcher: import('chokidar').FSWatcher | null = null
 let keyStore: vault.KeyStore = {}
+let nextRunId = 1
+const activeRuns = new Map<number, { aborted: boolean }>()
+
+function safeSend(sender: WebContents, channel: string, ...args: unknown[]) {
+  if (!sender.isDestroyed()) sender.send(channel, ...args)
+}
+
+async function runStream(
+  runId: number,
+  args: { provider: ProviderId; model: string; messages: LlmMessage[] },
+  sender: WebContents
+) {
+  const state = activeRuns.get(runId)
+  try {
+    const provider = LLM_PROVIDERS[args.provider]
+    if (!provider) throw new Error(`Unknown provider: ${args.provider}`)
+    const resolved = vault.resolveKey(args.provider, keyStore, process.env)
+    if (args.provider !== 'ollama' && !resolved) throw new Error(`No API key configured for ${args.provider}`)
+    const apiKey = args.provider === 'ollama' ? (resolved ?? OLLAMA_DEFAULT_HOST) : resolved!
+    for await (const chunk of provider.stream({ model: args.model, messages: args.messages, apiKey })) {
+      if (state?.aborted) return
+      safeSend(sender, CH.llmChunk, runId, chunk)
+    }
+    if (!state?.aborted) safeSend(sender, CH.llmDone, runId)
+  } catch (err) {
+    if (!state?.aborted) safeSend(sender, CH.llmError, runId, err instanceof Error ? err.message : String(err))
+  } finally {
+    activeRuns.delete(runId)
+  }
+}
 
 const currentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
 
@@ -68,6 +108,27 @@ function registerIpc() {
   ipcMain.handle(CH.saveThread, (_e, folder: string, filePath: string, messages: ThreadMessage[]) =>
     history.saveThread(folder, filePath, messages))
   ipcMain.handle(CH.loadRules, (_e, folder: string) => history.loadRules(folder))
+  ipcMain.handle(CH.llmStart, (e, args: { provider: ProviderId; model: string; messages: LlmMessage[] }) => {
+    const runId = nextRunId++
+    activeRuns.set(runId, { aborted: false })
+    void runStream(runId, args, e.sender)
+    return runId
+  })
+  ipcMain.on(CH.llmStop, (_e, runId: number) => {
+    const state = activeRuns.get(runId)
+    if (state) state.aborted = true
+  })
+  ipcMain.handle(CH.listModels, async (_e, provider: ProviderId) => {
+    if (provider === 'ollama') {
+      const host = vault.resolveKey('ollama', keyStore, process.env) ?? OLLAMA_DEFAULT_HOST
+      try {
+        return await listOllamaModels(host)
+      } catch {
+        return []
+      }
+    }
+    return CURATED_MODELS[provider] ?? []
+  })
 }
 
 function createWindow() {

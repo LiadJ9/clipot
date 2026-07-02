@@ -1,7 +1,9 @@
 import type { Provider, ProviderId } from './types'
 import { anthropic } from './anthropic'
-// openai, gemini, ollama added in Task 13
-export const PROVIDERS: Partial<Record<ProviderId, Provider>> = { anthropic }
+import { openai } from './openai'
+import { gemini } from './gemini'
+import { ollama } from './ollama'
+export const PROVIDERS: Partial<Record<ProviderId, Provider>> = { anthropic, openai, gemini, ollama }
 export function capabilityFor(id: ProviderId, model: string): { vision: boolean } {
   return { vision: PROVIDERS[id]?.supportsVision(model) ?? false }
 }

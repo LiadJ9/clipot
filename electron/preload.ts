@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { CH, type ClipotApi } from './shared/ipc'
 
 const api: ClipotApi = {
@@ -24,5 +24,30 @@ const api: ClipotApi = {
   loadThread: (folder, filePath) => ipcRenderer.invoke(CH.loadThread, folder, filePath),
   saveThread: (folder, filePath, messages) => ipcRenderer.invoke(CH.saveThread, folder, filePath, messages),
   loadRules: (folder) => ipcRenderer.invoke(CH.loadRules, folder),
+  startStream: (args, handlers) => {
+    let runId: number | null = null
+    let stopped = false
+    const onChunk = (_e: IpcRendererEvent, id: number, text: string) => { if (id === runId) handlers.onChunk(text) }
+    const onDone = (_e: IpcRendererEvent, id: number) => { if (id === runId) { handlers.onDone(); cleanup() } }
+    const onError = (_e: IpcRendererEvent, id: number, message: string) => { if (id === runId) { handlers.onError(message); cleanup() } }
+    const cleanup = () => {
+      ipcRenderer.off(CH.llmChunk, onChunk)
+      ipcRenderer.off(CH.llmDone, onDone)
+      ipcRenderer.off(CH.llmError, onError)
+    }
+    ipcRenderer.on(CH.llmChunk, onChunk)
+    ipcRenderer.on(CH.llmDone, onDone)
+    ipcRenderer.on(CH.llmError, onError)
+    ipcRenderer.invoke(CH.llmStart, args).then((id: number) => {
+      if (stopped) { ipcRenderer.send(CH.llmStop, id); return }
+      runId = id
+    })
+    return () => {
+      stopped = true
+      cleanup()
+      if (runId !== null) ipcRenderer.send(CH.llmStop, runId)
+    }
+  },
+  listModels: (provider) => ipcRenderer.invoke(CH.listModels, provider),
 }
 contextBridge.exposeInMainWorld('clipot', api)

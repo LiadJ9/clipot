@@ -1,0 +1,3 @@
+{"message":{"content":"Hello "},"done":false}
+{"message":{"content":"world"},"done":false}
+{"done":true}
