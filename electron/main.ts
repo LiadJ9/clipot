@@ -8,13 +8,17 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL
 
 let watcher: import('chokidar').FSWatcher | null = null
 
-function registerIpc(win: BrowserWindow) {
+const currentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+
+function registerIpc() {
   ipcMain.handle(CH.pickFolder, async () => {
+    const win = currentWindow()
+    if (!win) return null
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
     if (r.canceled || !r.filePaths[0]) return null
     watcher?.close()
     watcher = chokidar.watch(r.filePaths[0], { ignoreInitial: true, ignored: /(^|[/\\])\.clipot/ })
-    watcher.on('all', () => win.webContents.send(CH.treeChanged))
+    watcher.on('all', () => currentWindow()?.webContents.send(CH.treeChanged))
     return r.filePaths[0]
   })
   ipcMain.handle(CH.readTree, (_e, root: string) => files.readTree(root))
@@ -40,12 +44,14 @@ function createWindow() {
       sandbox: true,
     },
   })
-  registerIpc(win)
   if (isDev) win.loadURL(process.env.VITE_DEV_SERVER_URL!)
   else win.loadFile(join(__dirname, '../dist/index.html'))
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  registerIpc()
+  createWindow()
+})
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
