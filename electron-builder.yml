@@ -1,0 +1,16 @@
+appId: health.dive.clipot
+productName: clipot
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+  - assets/**
+linux:
+  target: [deb, AppImage]
+  category: Graphics
+win:
+  target: [nsis]
+mac:
+  target: [dmg]
+  category: public.app-category.graphics-design
