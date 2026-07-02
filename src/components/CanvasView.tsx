@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store/store'
 import { ensureId } from '@/lib/svgDoc'
-import { labelFor, type Selection } from '@/lib/selection'
+import { labelFor } from '@/lib/selection'
+import { resolveClick, stampPaths } from '@/lib/canvasSelect'
 
 type Bubble = { n: number; x: number; y: number }
 
@@ -10,16 +11,6 @@ export function sanitize(root: SVGSVGElement) {
   for (const el of [root, ...Array.from(root.querySelectorAll('*'))]) {
     for (const a of Array.from(el.attributes)) if (a.name.startsWith('on')) el.removeAttribute(a.name)
   }
-}
-
-function pathTo(root: Element, el: Element): number[] {
-  const path: number[] = []
-  let cur = el
-  while (cur !== root && cur.parentElement) {
-    path.unshift(Array.prototype.indexOf.call(cur.parentElement.children, cur))
-    cur = cur.parentElement
-  }
-  return path
 }
 
 // Top-left of an element's bbox, in viewport (client) coordinates.
@@ -62,24 +53,16 @@ export default function CanvasView() {
     const root = doc.documentElement as unknown as SVGSVGElement
     if (root.tagName.toLowerCase() !== 'svg') { setBubbles([]); return }
     sanitize(root)
+    stampPaths(root)
     host.appendChild(root)
 
     const onClick = (e: MouseEvent) => {
       const target = e.target as Element
-      if (target === root) return
+      const action = resolveClick(root, target, selections)
+      if (action.kind === 'none') return
       e.stopPropagation()
-      let matched: Selection | undefined
-      let cur: Element | null = target
-      while (cur && cur !== root) {
-        if (cur.id) {
-          matched = selections.find((s) => s.id === cur!.id)
-          if (matched) break
-        }
-        cur = cur.parentElement
-      }
-      if (matched) { removeSelection(matched.n); return }
-      const p = pathTo(root, target)
-      const { source: next, id } = ensureId(source, p)
+      if (action.kind === 'deselect') { removeSelection(action.n); return }
+      const { source: next, id } = ensureId(source, action.path)
       if (next !== source) setSource(next)
       addSelection(id, labelFor(next, id))
     }
