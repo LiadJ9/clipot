@@ -13,20 +13,53 @@ import { createUndoStack } from '@/lib/undoStack'
 // Module-level undo stack, rebound whenever the active document changes.
 let undo = createUndoStack('')
 
-function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: number): (...args: A) => void {
-  let timer: ReturnType<typeof setTimeout> | null = null
-  return (...args: A) => {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      fn(...args)
-    }, ms)
+// Minimal shape of zustand's setter we need for error reporting.
+type SetError = (partial: Partial<State>) => void
+
+// Single place all source-to-disk writes go through, so I/O failures surface as `error`.
+async function writeSource(path: string, content: string, set: SetError): Promise<void> {
+  try {
+    await window.clipot.writeFile(path, content)
+  } catch {
+    set({ error: 'Failed to save file.' })
   }
 }
 
+type Debounced<A extends unknown[]> = ((...args: A) => void) & { cancel(): void; flush(): void }
+
+function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: number): Debounced<A> {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let lastArgs: A | null = null
+  const run = () => {
+    timer = null
+    if (lastArgs) {
+      const args = lastArgs
+      lastArgs = null
+      fn(...args)
+    }
+  }
+  const debounced = ((...args: A) => {
+    lastArgs = args
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(run, ms)
+  }) as Debounced<A>
+  debounced.cancel = () => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    lastArgs = null
+  }
+  debounced.flush = () => {
+    if (timer) {
+      clearTimeout(timer)
+      run()
+    }
+  }
+  return debounced
+}
+
 // Autosave writes are debounced so rapid edit-block applies don't thrash disk.
-const debouncedWrite = debounce((path: string, content: string) => {
-  void window.clipot.writeFile(path, content)
+const debouncedWrite = debounce((path: string, content: string, set: SetError) => {
+  void writeSource(path, content, set)
 }, 300)
 
 type State = {
@@ -35,7 +68,9 @@ type State = {
   streaming: boolean; activity: string; editCount: { done: number; total: number } | null
   provider: ProviderId; model: string; rules: string; mode: 'edit' | 'new'
   regionImage?: string | null; regionIds?: string[]
+  error: string | null
   _stop?: (() => void) | null
+  clearError(): void
   addSelection(id: string, label: string): void
   removeSelection(n: number): void
   revalidateSelections(): void
@@ -66,8 +101,9 @@ export const useStore = create<State>((set, get) => ({
   source: '', selections: [], thread: [],
   streaming: false, activity: '', editCount: null,
   provider: 'anthropic', model: 'claude-sonnet-5', rules: '', mode: 'edit',
-  regionImage: null, regionIds: [], _stop: null,
+  regionImage: null, regionIds: [], error: null, _stop: null,
 
+  clearError() { set({ error: null }) },
   addSelection(id, label) {
     const sel = get().selections
     if (sel.some((s) => s.id === id)) return
@@ -115,14 +151,21 @@ export const useStore = create<State>((set, get) => ({
 
   async sendPrompt(prompt) {
     const st = get()
+    if (st.streaming) return
     if (!st.activePath && st.mode !== 'new') return
     const folder = st.folder!
     const rules = st.rules || DEFAULT_RULES
     const priorThread = st.thread
-    if (st.activePath) await window.clipot.checkpoint(folder, st.activePath, st.source, prompt.slice(0, 40))
+    if (st.activePath) {
+      try {
+        await window.clipot.checkpoint(folder, st.activePath, st.source, prompt.slice(0, 40))
+      } catch {
+        set({ error: 'Failed to save checkpoint.' })
+      }
+    }
 
     const baseThread: ChatMessage[] = [...priorThread, { role: 'user', content: prompt }]
-    set({ streaming: true, activity: '', thread: baseThread, editCount: { done: 0, total: 0 } })
+    set({ streaming: true, activity: '', thread: baseThread, editCount: { done: 0, total: 0 }, error: null })
 
     const attempt = async (extraNote?: string): Promise<'ok' | 'retry'> => {
       const built = buildMessages({
@@ -155,6 +198,7 @@ export const useStore = create<State>((set, get) => ({
               try {
                 blocks = parser.push(t)
               } catch {
+                failure = { detail: 'Malformed edit block' }
                 return
               }
               for (const b of blocks) {
@@ -169,7 +213,7 @@ export const useStore = create<State>((set, get) => ({
                     },
                   }))
                   const ap = get().activePath
-                  if (ap) debouncedWrite(ap, r.source)
+                  if (ap) debouncedWrite(ap, r.source, set)
                   get().revalidateSelections()
                 } else {
                   failure = { detail: r.detail }
@@ -207,9 +251,17 @@ export const useStore = create<State>((set, get) => ({
       }))
     }
 
+    // Guarantee the final streamed edit is on disk before the thread is saved.
+    debouncedWrite.flush()
     set({ streaming: false, _stop: null, regionImage: null, regionIds: [] })
     const activePath = get().activePath
-    if (activePath) await window.clipot.saveThread(folder, activePath, get().thread)
+    if (activePath) {
+      try {
+        await window.clipot.saveThread(folder, activePath, get().thread)
+      } catch {
+        set({ error: 'Failed to save thread.' })
+      }
+    }
   },
 
   stopStream() {
@@ -220,26 +272,32 @@ export const useStore = create<State>((set, get) => ({
   undo() {
     const s = undo.undo()
     if (s !== null) {
+      debouncedWrite.cancel() // drop any pending autosave for content we're discarding
       set({ source: s })
       get().revalidateSelections()
       const ap = get().activePath
-      if (ap) void window.clipot.writeFile(ap, s)
+      if (ap) void writeSource(ap, s, set)
     }
   },
   redo() {
     const s = undo.redo()
     if (s !== null) {
+      debouncedWrite.cancel() // drop any pending autosave for content we're discarding
       set({ source: s })
       get().revalidateSelections()
       const ap = get().activePath
-      if (ap) void window.clipot.writeFile(ap, s)
+      if (ap) void writeSource(ap, s, set)
     }
   },
   async duplicate() {
     const ap = get().activePath
     if (ap) {
-      await window.clipot.duplicate(ap)
-      await get().refreshTree()
+      try {
+        await window.clipot.duplicate(ap)
+        await get().refreshTree()
+      } catch {
+        set({ error: 'Failed to duplicate file.' })
+      }
     }
   },
   canUndo: () => undo.canUndo(),

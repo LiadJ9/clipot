@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useStore, pathExists } from '@/store/store'
 import type { TreeNode } from '../../electron/shared/ipc'
 
@@ -53,6 +53,81 @@ describe('sendPrompt', () => {
     expect(startStream.mock.calls[0][0].messages.at(-1).images).toEqual([
       { mime: 'image/png', dataBase64: 'AAA' },
     ])
+  })
+})
+
+describe('autosave debounce and undo race', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>'
+  const editReply = '<<<EDIT\nSEARCH:\n<rect id="clipot-1"/>\nREPLACE:\n<rect id="clipot-1" fill="blue"/>\n>>>'
+
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  // sendPrompt awaits checkpoint before starting the stream; flush microtasks to reach onChunk.
+  const tick = async () => { for (let i = 0; i < 5; i++) await Promise.resolve() }
+
+  // Streams the edit synchronously but defers onDone, leaving the 300ms autosave timer armed
+  // and sendPrompt() pending (so the trailing flush has not run yet).
+  function setupDeferredStream() {
+    const writeFile = vi.fn().mockResolvedValue(undefined)
+    let done: () => void = () => {}
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      checkpoint: vi.fn().mockResolvedValue('cp'),
+      writeFile,
+      saveThread: vi.fn().mockResolvedValue(undefined),
+      readFile: vi.fn().mockResolvedValue(svg),
+      loadThread: vi.fn().mockResolvedValue([]),
+      startStream: vi.fn((_args, h: { onChunk: (t: string) => void; onDone: () => void }) => {
+        h.onChunk(editReply)
+        done = h.onDone
+        return vi.fn()
+      }),
+    }
+    return { writeFile, finish: () => done() }
+  }
+
+  it('schedules a debounced write after a streamed edit that fires at 300ms with the edited source', async () => {
+    const { writeFile, finish } = setupDeferredStream()
+    useStore.setState({ folder: '/f' })
+    await useStore.getState().openFile('/f/a.svg')
+
+    const p = useStore.getState().sendPrompt('make it blue')
+    await tick()
+    expect(useStore.getState().source).toContain('fill="blue"')
+    expect(writeFile).not.toHaveBeenCalled() // debounce armed, not yet fired
+
+    vi.advanceTimersByTime(300)
+    expect(writeFile).toHaveBeenCalledWith('/f/a.svg', expect.stringContaining('fill="blue"'))
+
+    finish()
+    await p
+  })
+
+  it('RACE: undo cancels the pending debounced autosave so the stale edit never overwrites', async () => {
+    const { writeFile, finish } = setupDeferredStream()
+    useStore.setState({ folder: '/f' })
+    await useStore.getState().openFile('/f/a.svg')
+
+    const p = useStore.getState().sendPrompt('make it blue')
+    await tick()
+    expect(useStore.getState().source).toContain('fill="blue"')
+    expect(writeFile).not.toHaveBeenCalled() // edited autosave is pending
+
+    // User clicks Undo while the edited write is still queued.
+    useStore.getState().undo()
+    expect(useStore.getState().source).toBe(svg)
+    // Undo performed a direct write of the reverted source.
+    expect(writeFile).toHaveBeenCalledWith('/f/a.svg', svg)
+
+    writeFile.mockClear()
+    // The stale debounced write must NOT fire after cancel().
+    vi.advanceTimersByTime(1000)
+    for (const call of writeFile.mock.calls) {
+      expect(call[1]).not.toContain('fill="blue"')
+    }
+
+    finish()
+    await p
   })
 })
 
