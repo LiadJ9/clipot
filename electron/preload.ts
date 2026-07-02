@@ -17,5 +17,7 @@ const api: ClipotApi = {
     ipcRenderer.on(CH.treeChanged, h)
     return () => ipcRenderer.off(CH.treeChanged, h)
   },
+  keyStatus: () => ipcRenderer.invoke(CH.keyStatus),
+  setKey: (provider, value) => ipcRenderer.invoke(CH.setKey, provider, value),
 }
 contextBridge.exposeInMainWorld('clipot', api)

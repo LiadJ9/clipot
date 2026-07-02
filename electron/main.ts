@@ -1,14 +1,32 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
 import { join } from 'node:path'
 import chokidar from 'chokidar'
 import { CH } from './shared/ipc'
 import * as files from './services/files'
+import * as vault from './services/vault'
+import type { ProviderId } from './services/vault'
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL
+const PROVIDERS: ProviderId[] = ['anthropic', 'openai', 'gemini', 'ollama']
+const ENV_VAR: Record<ProviderId, string> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  ollama: 'OLLAMA_HOST',
+}
 
 let watcher: import('chokidar').FSWatcher | null = null
+let keyStore: vault.KeyStore = {}
 
 const currentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+
+function loadVaultIntoEnv() {
+  keyStore = vault.loadStore(app.getPath('userData'), safeStorage)
+  for (const provider of PROVIDERS) {
+    const envVar = ENV_VAR[provider]
+    if (!process.env[envVar] && keyStore[provider]) process.env[envVar] = keyStore[provider]
+  }
+}
 
 function registerIpc() {
   ipcMain.handle(CH.pickFolder, async () => {
@@ -30,6 +48,16 @@ function registerIpc() {
   ipcMain.handle(CH.move, (_e, from: string, dir: string) => files.move(from, dir))
   ipcMain.handle(CH.remove, (_e, p: string) => files.remove(p))
   ipcMain.handle(CH.duplicate, (_e, p: string) => files.duplicateFile(p))
+  ipcMain.handle(CH.keyStatus, () => {
+    const status = {} as Record<ProviderId, boolean>
+    for (const provider of PROVIDERS) status[provider] = vault.resolveKey(provider, keyStore, process.env) !== null
+    return status
+  })
+  ipcMain.handle(CH.setKey, (_e, provider: ProviderId, value: string) => {
+    keyStore = { ...keyStore, [provider]: value }
+    vault.saveStore(app.getPath('userData'), safeStorage, keyStore)
+    process.env[ENV_VAR[provider]] = value
+  })
 }
 
 function createWindow() {
@@ -49,6 +77,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  loadVaultIntoEnv()
   registerIpc()
   createWindow()
 })

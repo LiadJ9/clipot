@@ -1,4 +1,5 @@
 import type { TreeNode } from '../services/files'
+import type { ProviderId } from '../services/vault'
 
 export const CH = {
   pickFolder: 'files:pickFolder',
@@ -12,6 +13,8 @@ export const CH = {
   remove: 'files:remove',
   duplicate: 'files:duplicate',
   treeChanged: 'files:treeChanged',
+  keyStatus: 'vault:keyStatus',
+  setKey: 'vault:setKey',
 } as const
 
 export interface ClipotApi {
@@ -26,10 +29,12 @@ export interface ClipotApi {
   remove(path: string): Promise<void>
   duplicate(path: string): Promise<string>
   onTreeChanged(cb: () => void): () => void
+  keyStatus(): Promise<Record<ProviderId, boolean>>
+  setKey(provider: ProviderId, value: string): Promise<void>
 }
 
 declare global {
   interface Window { clipot: ClipotApi }
 }
 
-export type { TreeNode }
+export type { TreeNode, ProviderId }
