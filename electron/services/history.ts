@@ -1,10 +1,15 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
-import { join, basename, extname } from 'node:path'
+import { join, extname, relative, dirname } from 'node:path'
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
-const stem = (f: string) => basename(f, extname(f))
-const histDir = (folder: string, f: string) => join(folder, '.clipot', 'history', stem(f))
-const threadFile = (folder: string, f: string) => join(folder, '.clipot', 'threads', `${stem(f)}.json`)
+// Key history on the folder-relative path (minus extension) so same-named files in
+// different subfolders (a/logo.svg vs b/logo.svg) don't share checkpoints/threads.
+const relKey = (folder: string, f: string) => {
+  const rel = relative(folder, f)
+  return rel.slice(0, rel.length - extname(rel).length)
+}
+const histDir = (folder: string, f: string) => join(folder, '.clipot', 'history', relKey(folder, f))
+const threadFile = (folder: string, f: string) => join(folder, '.clipot', 'threads', `${relKey(folder, f)}.json`)
 const rulesFile = (folder: string) => join(folder, '.clipot', 'rules.md')
 
 export async function checkpoint(folder: string, filePath: string, source: string, promptSlug: string): Promise<string> {
@@ -26,7 +31,7 @@ export async function listCheckpoints(folder: string, filePath: string) {
 
 export async function saveThread(folder: string, filePath: string, messages: ChatMessage[]): Promise<void> {
   const f = threadFile(folder, filePath)
-  await mkdir(join(folder, '.clipot', 'threads'), { recursive: true })
+  await mkdir(dirname(f), { recursive: true })
   await writeFile(f, JSON.stringify(messages, null, 2), 'utf8')
 }
 

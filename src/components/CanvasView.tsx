@@ -15,10 +15,23 @@ function isRealDrag(start: { x: number; y: number }, end: { x: number; y: number
   return Math.abs(end.x - start.x) >= MIN_DRAG_PX || Math.abs(end.y - start.y) >= MIN_DRAG_PX
 }
 
+// Link targets we allow to survive sanitization. Anything else (javascript:,
+// other schemes) is stripped so injected/untrusted SVGs can't run on click.
+const ALLOWED_HREF_PREFIXES = ['#', 'http:', 'https:', 'data:image/']
+
 export function sanitize(root: SVGSVGElement) {
   root.querySelectorAll('script').forEach((n) => n.remove())
+  // SMIL animation elements can set attributes at runtime, so drop them entirely.
+  root.querySelectorAll('animate, set, animateTransform, animateMotion').forEach((n) => n.remove())
   for (const el of [root, ...Array.from(root.querySelectorAll('*'))]) {
-    for (const a of Array.from(el.attributes)) if (a.name.startsWith('on')) el.removeAttribute(a.name)
+    for (const a of Array.from(el.attributes)) {
+      if (a.name.startsWith('on')) { el.removeAttributeNode(a); continue }
+      // Covers both `href` and `xlink:href` (localName is `href` in both cases).
+      if (a.localName === 'href') {
+        const value = a.value.trim().toLowerCase()
+        if (!ALLOWED_HREF_PREFIXES.some((prefix) => value.startsWith(prefix))) el.removeAttributeNode(a)
+      }
+    }
   }
 }
 

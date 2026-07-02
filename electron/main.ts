@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, session } from 'electron'
 import type { WebContents } from 'electron'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { readFile as readFileText } from 'node:fs/promises'
 import chokidar from 'chokidar'
 import { CH } from './shared/ipc'
@@ -31,7 +31,20 @@ const CURATED_MODELS: Partial<Record<ProviderId, string[]>> = {
 let watcher: import('chokidar').FSWatcher | null = null
 let keyStore: vault.KeyStore = {}
 let nextRunId = 1
+let openedFolder: string | null = null
 const activeRuns = new Map<number, { aborted: boolean }>()
+
+// Defense-in-depth: the renderer must not read/write/delete paths outside the
+// opened folder. Every path-taking IPC handler resolves its args through this.
+function assertInside(p: string): string {
+  if (!openedFolder) throw new Error('No folder opened')
+  const base = resolve(openedFolder)
+  const target = resolve(p)
+  if (target !== base && !target.startsWith(base + sep)) {
+    throw new Error(`Path escapes opened folder: ${p}`)
+  }
+  return target
+}
 
 function safeSend(sender: WebContents, channel: string, ...args: unknown[]) {
   if (!sender.isDestroyed()) sender.send(channel, ...args)
@@ -98,20 +111,25 @@ function registerIpc() {
       if (r.canceled || !r.filePaths[0]) return null
       folderPath = r.filePaths[0]
     }
+    openedFolder = resolve(folderPath)
     watcher?.close()
     watcher = chokidar.watch(folderPath, { ignoreInitial: true, ignored: /(^|[/\\])\.clipot/ })
     watcher.on('all', () => currentWindow()?.webContents.send(CH.treeChanged))
     return folderPath
   })
-  ipcMain.handle(CH.readTree, (_e, root: string) => files.readTree(root))
-  ipcMain.handle(CH.readFile, (_e, p: string) => files.readFile(p))
-  ipcMain.handle(CH.writeFile, (_e, p: string, c: string) => files.writeFileAtomic(p, c))
-  ipcMain.handle(CH.createFile, (_e, p: string, c: string) => files.createFile(p, c))
-  ipcMain.handle(CH.createDir, (_e, p: string) => files.createDir(p))
-  ipcMain.handle(CH.rename, (_e, from: string, to: string) => files.rename(from, to))
-  ipcMain.handle(CH.move, (_e, from: string, dir: string) => files.move(from, dir))
-  ipcMain.handle(CH.remove, (_e, p: string) => files.remove(p))
-  ipcMain.handle(CH.duplicate, (_e, p: string) => files.duplicateFile(p))
+  ipcMain.handle(CH.readTree, (_e, root: string) => { assertInside(root); return files.readTree(root) })
+  ipcMain.handle(CH.readFile, (_e, p: string) => { assertInside(p); return files.readFile(p) })
+  ipcMain.handle(CH.writeFile, (_e, p: string, c: string) => { assertInside(p); return files.writeFileAtomic(p, c) })
+  ipcMain.handle(CH.createFile, (_e, p: string, c: string) => { assertInside(p); return files.createFile(p, c) })
+  ipcMain.handle(CH.createDir, (_e, p: string) => { assertInside(p); return files.createDir(p) })
+  ipcMain.handle(CH.rename, (_e, from: string, to: string) => { assertInside(from); assertInside(to); return files.rename(from, to) })
+  ipcMain.handle(CH.move, (_e, from: string, dir: string) => { assertInside(from); assertInside(dir); return files.move(from, dir) })
+  ipcMain.handle(CH.remove, (_e, p: string) => {
+    const target = assertInside(p)
+    if (target === resolve(openedFolder!)) throw new Error('Refusing to delete the opened root folder')
+    return files.remove(p)
+  })
+  ipcMain.handle(CH.duplicate, (_e, p: string) => { assertInside(p); return files.duplicateFile(p) })
   ipcMain.handle(CH.keyStatus, () => {
     const status = {} as Record<ProviderId, boolean>
     for (const provider of PROVIDERS) status[provider] = vault.resolveKey(provider, keyStore, process.env) !== null
@@ -123,14 +141,24 @@ function registerIpc() {
     vault.saveStore(app.getPath('userData'), safeStorage, next)
     keyStore = next
   })
-  ipcMain.handle(CH.checkpoint, (_e, folder: string, filePath: string, source: string, promptSlug: string) =>
-    history.checkpoint(folder, filePath, source, promptSlug))
-  ipcMain.handle(CH.listCheckpoints, (_e, folder: string, filePath: string) => history.listCheckpoints(folder, filePath))
-  ipcMain.handle(CH.loadThread, (_e, folder: string, filePath: string) => history.loadThread(folder, filePath))
-  ipcMain.handle(CH.saveThread, (_e, folder: string, filePath: string, messages: ThreadMessage[]) =>
-    history.saveThread(folder, filePath, messages))
-  ipcMain.handle(CH.loadRules, (_e, folder: string) => history.loadRules(folder))
-  ipcMain.handle(CH.saveRules, (_e, folder: string, content: string) => history.saveRules(folder, content))
+  ipcMain.handle(CH.checkpoint, (_e, folder: string, filePath: string, source: string, promptSlug: string) => {
+    assertInside(folder); assertInside(filePath)
+    return history.checkpoint(folder, filePath, source, promptSlug)
+  })
+  ipcMain.handle(CH.listCheckpoints, (_e, folder: string, filePath: string) => {
+    assertInside(folder); assertInside(filePath)
+    return history.listCheckpoints(folder, filePath)
+  })
+  ipcMain.handle(CH.loadThread, (_e, folder: string, filePath: string) => {
+    assertInside(folder); assertInside(filePath)
+    return history.loadThread(folder, filePath)
+  })
+  ipcMain.handle(CH.saveThread, (_e, folder: string, filePath: string, messages: ThreadMessage[]) => {
+    assertInside(folder); assertInside(filePath)
+    return history.saveThread(folder, filePath, messages)
+  })
+  ipcMain.handle(CH.loadRules, (_e, folder: string) => { assertInside(folder); return history.loadRules(folder) })
+  ipcMain.handle(CH.saveRules, (_e, folder: string, content: string) => { assertInside(folder); return history.saveRules(folder, content) })
   ipcMain.handle(CH.llmStart, (e, args: { provider: ProviderId; model: string; messages: LlmMessage[] }) => {
     const runId = nextRunId++
     activeRuns.set(runId, { aborted: false })
@@ -166,12 +194,30 @@ function createWindow() {
       sandbox: true,
     },
   })
+  // Lock down navigation: block window.open and any in-page navigation. The
+  // initial programmatic loadURL/loadFile below does not trigger will-navigate.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (e) => e.preventDefault())
   if (isDev) win.loadURL(process.env.VITE_DEV_SERVER_URL!)
   else win.loadFile(join(__dirname, '../dist/index.html'))
 }
 
+function applyCsp() {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws://localhost:* http://localhost:*",
+        ],
+      },
+    })
+  })
+}
+
 app.whenReady().then(() => {
   loadVaultIntoEnv()
+  applyCsp()
   registerIpc()
   createWindow()
 })
