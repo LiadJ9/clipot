@@ -17,6 +17,9 @@ type State = {
   setModel(provider: ProviderId, model: string): void
   setRules(r: string): void
   startNewFile(): void
+  openFolder(): Promise<void>
+  refreshTree(): Promise<void>
+  openFile(path: string): Promise<void>
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -41,4 +44,22 @@ export const useStore = create<State>((set, get) => ({
   setModel(provider, model) { set({ provider, model }) },
   setRules(r) { set({ rules: r }) },
   startNewFile() { set({ mode: 'new', activePath: null, source: '', selections: [], thread: [] }) },
+
+  async openFolder() {
+    const folder = await window.clipot.pickFolder()
+    if (!folder) return
+    const tree = await window.clipot.readTree(folder)
+    const rules = (await window.clipot.loadRules(folder)) ?? '' // rules default filled in Task 17
+    set({ folder, tree, rules })
+    window.clipot.onTreeChanged(async () => set({ tree: await window.clipot.readTree(folder) }))
+  },
+  async refreshTree() {
+    const f = get().folder
+    if (f) set({ tree: await window.clipot.readTree(f) })
+  },
+  async openFile(path) {
+    const source = await window.clipot.readFile(path)
+    const thread = get().folder ? await window.clipot.loadThread(get().folder!, path) : []
+    set({ activePath: path, source, selections: [], thread, mode: 'edit' })
+  },
 }))

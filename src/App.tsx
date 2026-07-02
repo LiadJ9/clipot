@@ -1,5 +1,6 @@
 import './theme.css'
 import logoUrl from '../assets/logo.svg'
+import FileTree from './components/FileTree'
 
 export default function App() {
   return (
@@ -9,7 +10,7 @@ export default function App() {
         <span className="name">clipot</span>
       </div>
       <div className="body">
-        <aside className="sidebar" data-testid="sidebar" />
+        <aside className="sidebar" data-testid="sidebar"><FileTree /></aside>
         <div className="main">
           <div data-testid="toolbar" style={{ height: 36, background: 'var(--panel)', borderBottom: '1px solid var(--border)' }} />
           <div className="canvas-wrap" data-testid="canvas" />
