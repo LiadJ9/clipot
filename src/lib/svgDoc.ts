@@ -1,3 +1,5 @@
+import type { EditBlock } from './editStream'
+
 export class SvgParseError extends Error {}
 
 export function parseSvg(source: string): SVGSVGElement {
@@ -39,4 +41,26 @@ export function ensureId(source: string, targetPath: number[]): { source: string
   const id = nextClipotId(root)
   el.setAttribute('id', id)
   return { source: serializeSvg(root as unknown as SVGSVGElement), id }
+}
+
+export type ApplyResult =
+  | { ok: true; source: string }
+  | { ok: false; reason: 'no-match' | 'invalid-result'; detail: string }
+
+function validate(source: string): string | null {
+  try { parseSvg(source); return null } catch (e) { return (e as Error).message }
+}
+
+export function applyEdit(source: string, block: EditBlock): ApplyResult {
+  let next: string
+  if (block.kind === 'file') {
+    next = block.content
+  } else {
+    const idx = source.indexOf(block.search)
+    if (idx < 0) return { ok: false, reason: 'no-match', detail: 'SEARCH text not found in current file' }
+    next = source.slice(0, idx) + block.replace + source.slice(idx + block.search.length)
+  }
+  const err = validate(next)
+  if (err) return { ok: false, reason: 'invalid-result', detail: err }
+  return { ok: true, source: next }
 }
