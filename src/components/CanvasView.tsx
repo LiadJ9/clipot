@@ -145,6 +145,16 @@ export default function CanvasView() {
     const root = doc.documentElement as unknown as SVGSVGElement
     if (root.tagName.toLowerCase() !== 'svg') { setBubbles([]); return }
     sanitize(root)
+    // A viewBox-only <svg> (no width/height) has no intrinsic size, so it collapses
+    // to 0px in its auto-sized container. Fall back to the viewBox size, matching
+    // how a browser renders a standalone SVG document.
+    if (!root.hasAttribute('width') && !root.hasAttribute('height')) {
+      const vb = root.getAttribute('viewBox')?.trim().split(/[\s,]+/).map(Number)
+      if (vb?.length === 4 && vb[2] > 0 && vb[3] > 0) {
+        root.setAttribute('width', String(vb[2]))
+        root.setAttribute('height', String(vb[3]))
+      }
+    }
     stampPaths(root)
     host.appendChild(root)
     rootRef.current = root

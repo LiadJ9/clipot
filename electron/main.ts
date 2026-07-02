@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
 import type { WebContents } from 'electron'
 import { join } from 'node:path'
+import { readFile as readFileText } from 'node:fs/promises'
 import chokidar from 'chokidar'
 import { CH } from './shared/ipc'
 import type { ThreadMessage } from './shared/ipc'
@@ -43,6 +44,16 @@ async function runStream(
 ) {
   const state = activeRuns.get(runId)
   try {
+    // Test-only hook: stream a fixture file's contents instead of calling a real
+    // provider. Strictly gated on CLIPOT_MOCK_LLM so production is unaffected.
+    const mockLlmPath = process.env.CLIPOT_MOCK_LLM
+    if (mockLlmPath) {
+      const text = await readFileText(mockLlmPath, 'utf8')
+      if (state?.aborted) return
+      safeSend(sender, CH.llmChunk, runId, text)
+      if (!state?.aborted) safeSend(sender, CH.llmDone, runId)
+      return
+    }
     const provider = LLM_PROVIDERS[args.provider]
     if (!provider) throw new Error(`Unknown provider: ${args.provider}`)
     const resolved = vault.resolveKey(args.provider, keyStore, process.env)
@@ -75,14 +86,22 @@ function loadVaultIntoEnv() {
 
 function registerIpc() {
   ipcMain.handle(CH.pickFolder, async () => {
-    const win = currentWindow()
-    if (!win) return null
-    const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
-    if (r.canceled || !r.filePaths[0]) return null
+    // Test-only hook: skip the native dialog and use this path directly.
+    // Strictly gated on CLIPOT_TEST_FOLDER so production is unaffected.
+    let folderPath: string
+    if (process.env.CLIPOT_TEST_FOLDER) {
+      folderPath = process.env.CLIPOT_TEST_FOLDER
+    } else {
+      const win = currentWindow()
+      if (!win) return null
+      const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
+      if (r.canceled || !r.filePaths[0]) return null
+      folderPath = r.filePaths[0]
+    }
     watcher?.close()
-    watcher = chokidar.watch(r.filePaths[0], { ignoreInitial: true, ignored: /(^|[/\\])\.clipot/ })
+    watcher = chokidar.watch(folderPath, { ignoreInitial: true, ignored: /(^|[/\\])\.clipot/ })
     watcher.on('all', () => currentWindow()?.webContents.send(CH.treeChanged))
-    return r.filePaths[0]
+    return folderPath
   })
   ipcMain.handle(CH.readTree, (_e, root: string) => files.readTree(root))
   ipcMain.handle(CH.readFile, (_e, p: string) => files.readFile(p))
