@@ -22,6 +22,12 @@ type State = {
   openFile(path: string): Promise<void>
 }
 
+export function pathExists(node: TreeNode | null, path: string): boolean {
+  if (!node) return false
+  if (node.path === path) return true
+  return node.children?.some((c) => pathExists(c, path)) ?? false
+}
+
 export const useStore = create<State>((set, get) => ({
   folder: null, tree: null, activePath: null,
   source: '', selections: [], thread: [],
@@ -51,11 +57,17 @@ export const useStore = create<State>((set, get) => ({
     const tree = await window.clipot.readTree(folder)
     const rules = (await window.clipot.loadRules(folder)) ?? '' // rules default filled in Task 17
     set({ folder, tree, rules })
-    window.clipot.onTreeChanged(async () => set({ tree: await window.clipot.readTree(folder) }))
+    window.clipot.onTreeChanged(() => get().refreshTree())
   },
   async refreshTree() {
     const f = get().folder
-    if (f) set({ tree: await window.clipot.readTree(f) })
+    if (!f) return
+    const tree = await window.clipot.readTree(f)
+    set({ tree })
+    const { activePath } = get()
+    if (activePath && !pathExists(tree, activePath)) {
+      set({ activePath: null, source: '', selections: [], thread: [] })
+    }
   },
   async openFile(path) {
     const source = await window.clipot.readFile(path)

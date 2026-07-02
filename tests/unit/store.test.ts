@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useStore } from '@/store/store'
+import { useStore, pathExists } from '@/store/store'
+import type { TreeNode } from '../../electron/shared/ipc'
 
 beforeEach(() => useStore.setState({ selections: [], source: '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>' }))
 
@@ -17,5 +18,27 @@ describe('store selections', () => {
     const s = useStore.getState()
     s.addSelection('a', 'a'); s.addSelection('b', 'b'); s.removeSelection(1)
     expect(useStore.getState().selections.map((x) => [x.n, x.id])).toEqual([[1, 'b']])
+  })
+})
+
+describe('pathExists', () => {
+  const tree: TreeNode = {
+    name: 'root', path: '/root', kind: 'dir',
+    children: [
+      { name: 'a.svg', path: '/root/a.svg', kind: 'file' },
+      { name: 'sub', path: '/root/sub', kind: 'dir', children: [{ name: 'b.svg', path: '/root/sub/b.svg', kind: 'file' }] },
+    ],
+  }
+  it('finds the root itself', () => {
+    expect(pathExists(tree, '/root')).toBe(true)
+  })
+  it('finds a nested file at any depth', () => {
+    expect(pathExists(tree, '/root/sub/b.svg')).toBe(true)
+  })
+  it('returns false for a path no longer in the tree', () => {
+    expect(pathExists(tree, '/root/gone.svg')).toBe(false)
+  })
+  it('returns false for a null tree', () => {
+    expect(pathExists(null, '/root/a.svg')).toBe(false)
   })
 })
