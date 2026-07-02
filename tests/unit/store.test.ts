@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useStore, pathExists } from '@/store/store'
 import type { TreeNode } from '../../electron/shared/ipc'
 
@@ -18,6 +18,41 @@ describe('store selections', () => {
     const s = useStore.getState()
     s.addSelection('a', 'a'); s.addSelection('b', 'b'); s.removeSelection(1)
     expect(useStore.getState().selections.map((x) => [x.n, x.id])).toEqual([[1, 'b']])
+  })
+})
+
+describe('sendPrompt', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>'
+  const editReply = '<<<EDIT\nSEARCH:\n<rect id="clipot-1"/>\nREPLACE:\n<rect id="clipot-1" fill="blue"/>\n>>>'
+
+  it('streams an edit block, applies it live, updates thread, and clears region state', async () => {
+    const saveThread = vi.fn().mockResolvedValue(undefined)
+    const stop = vi.fn()
+    const startStream = vi.fn((_args, h) => { h.onChunk(editReply); h.onDone(); return stop })
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      checkpoint: vi.fn().mockResolvedValue('cp'),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      saveThread,
+      startStream,
+    }
+    useStore.setState({
+      folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit',
+      regionImage: 'data:image/png;base64,AAA', regionIds: ['clipot-1'],
+    })
+
+    await useStore.getState().sendPrompt('make it blue')
+
+    const s = useStore.getState()
+    expect(s.source).toContain('fill="blue"')
+    expect(s.editCount).toEqual({ done: 1, total: 1 })
+    expect(s.thread.map((m) => m.role)).toEqual(['user', 'assistant'])
+    expect(s.streaming).toBe(false)
+    expect(s.regionImage).toBeNull()
+    expect(s.regionIds).toEqual([])
+    expect(saveThread).toHaveBeenCalledWith('/f', '/f/a.svg', s.thread)
+    expect(startStream.mock.calls[0][0].messages.at(-1).images).toEqual([
+      { mime: 'image/png', dataBase64: 'AAA' },
+    ])
   })
 })
 

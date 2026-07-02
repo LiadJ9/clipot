@@ -48,7 +48,10 @@ async function runStream(
     const resolved = vault.resolveKey(args.provider, keyStore, process.env)
     if (args.provider !== 'ollama' && !resolved) throw new Error(`No API key configured for ${args.provider}`)
     const apiKey = args.provider === 'ollama' ? (resolved ?? OLLAMA_DEFAULT_HOST) : resolved!
-    for await (const chunk of provider.stream({ model: args.model, messages: args.messages, apiKey })) {
+    const messages = provider.supportsVision(args.model)
+      ? args.messages
+      : args.messages.map(({ images: _images, ...rest }) => rest)
+    for await (const chunk of provider.stream({ model: args.model, messages, apiKey })) {
       if (state?.aborted) return
       safeSend(sender, CH.llmChunk, runId, chunk)
     }
