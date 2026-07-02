@@ -5,6 +5,7 @@ type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 const stem = (f: string) => basename(f, extname(f))
 const histDir = (folder: string, f: string) => join(folder, '.clipot', 'history', stem(f))
 const threadFile = (folder: string, f: string) => join(folder, '.clipot', 'threads', `${stem(f)}.json`)
+const rulesFile = (folder: string) => join(folder, '.clipot', 'rules.md')
 
 export async function checkpoint(folder: string, filePath: string, source: string, promptSlug: string): Promise<string> {
   const dir = histDir(folder, filePath)
@@ -34,5 +35,10 @@ export async function loadThread(folder: string, filePath: string): Promise<Chat
 }
 
 export async function loadRules(folder: string): Promise<string | null> {
-  try { return await readFile(join(folder, '.clipot', 'rules.md'), 'utf8') } catch { return null }
+  try { return await readFile(rulesFile(folder), 'utf8') } catch { return null }
+}
+
+export async function saveRules(folder: string, content: string): Promise<void> {
+  await mkdir(join(folder, '.clipot'), { recursive: true })
+  await writeFile(rulesFile(folder), content, 'utf8')
 }

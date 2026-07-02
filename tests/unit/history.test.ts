@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkpoint, listCheckpoints, saveThread, loadThread } from '../../electron/services/history'
+import { checkpoint, listCheckpoints, saveThread, loadThread, saveRules, loadRules } from '../../electron/services/history'
 
 let dir: string
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'clipot-h-')) })
@@ -21,5 +21,10 @@ describe('history', () => {
     const f = join(dir, 'logo.svg')
     await saveThread(dir, f, [{ role: 'user', content: 'hi' }])
     expect(await loadThread(dir, f)).toEqual([{ role: 'user', content: 'hi' }])
+  })
+  it('round-trips rules to .clipot/rules.md', async () => {
+    expect(await loadRules(dir)).toBeNull()
+    await saveRules(dir, 'Keep it minimal.')
+    expect(await loadRules(dir)).toBe('Keep it minimal.')
   })
 })

@@ -24,6 +24,7 @@ const api: ClipotApi = {
   loadThread: (folder, filePath) => ipcRenderer.invoke(CH.loadThread, folder, filePath),
   saveThread: (folder, filePath, messages) => ipcRenderer.invoke(CH.saveThread, folder, filePath, messages),
   loadRules: (folder) => ipcRenderer.invoke(CH.loadRules, folder),
+  saveRules: (folder, content) => ipcRenderer.invoke(CH.saveRules, folder, content),
   startStream: (args, handlers) => {
     let runId: number | null = null
     let stopped = false

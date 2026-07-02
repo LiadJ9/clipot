@@ -23,6 +23,7 @@ export const CH = {
   loadThread: 'history:loadThread',
   saveThread: 'history:saveThread',
   loadRules: 'history:loadRules',
+  saveRules: 'history:saveRules',
   llmStart: 'llm:start',
   llmStop: 'llm:stop',
   llmChunk: 'llm:chunk',
@@ -50,6 +51,7 @@ export interface ClipotApi {
   loadThread(folder: string, filePath: string): Promise<ThreadMessage[]>
   saveThread(folder: string, filePath: string, messages: ThreadMessage[]): Promise<void>
   loadRules(folder: string): Promise<string | null>
+  saveRules(folder: string, content: string): Promise<void>
   startStream(
     args: { provider: ProviderId; model: string; messages: LlmMessage[] },
     handlers: { onChunk: (text: string) => void; onDone: () => void; onError: (message: string) => void }

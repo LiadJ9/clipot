@@ -68,6 +68,7 @@ type State = {
   streaming: boolean; activity: string; editCount: { done: number; total: number } | null
   provider: ProviderId; model: string; rules: string; mode: 'edit' | 'new'
   regionImage?: string | null; regionIds?: string[]
+  regionMode: boolean; threadOpen: boolean
   error: string | null
   _stop?: (() => void) | null
   clearError(): void
@@ -77,6 +78,8 @@ type State = {
   setSource(s: string): void
   setModel(provider: ProviderId, model: string): void
   setRules(r: string): void
+  toggleRegionMode(): void
+  toggleThread(): void
   startNewFile(): void
   openFolder(): Promise<void>
   refreshTree(): Promise<void>
@@ -101,7 +104,7 @@ export const useStore = create<State>((set, get) => ({
   source: '', selections: [], thread: [],
   streaming: false, activity: '', editCount: null,
   provider: 'anthropic', model: 'claude-sonnet-5', rules: '', mode: 'edit',
-  regionImage: null, regionIds: [], error: null, _stop: null,
+  regionImage: null, regionIds: [], regionMode: false, threadOpen: false, error: null, _stop: null,
 
   clearError() { set({ error: null }) },
   addSelection(id, label) {
@@ -119,6 +122,8 @@ export const useStore = create<State>((set, get) => ({
   setSource(s) { set({ source: s }) },
   setModel(provider, model) { set({ provider, model }) },
   setRules(r) { set({ rules: r }) },
+  toggleRegionMode() { set((s) => ({ regionMode: !s.regionMode })) },
+  toggleThread() { set((s) => ({ threadOpen: !s.threadOpen })) },
   startNewFile() {
     undo = createUndoStack('')
     set({ mode: 'new', activePath: null, source: '', selections: [], thread: [] })

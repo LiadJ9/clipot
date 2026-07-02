@@ -111,6 +111,7 @@ function registerIpc() {
   ipcMain.handle(CH.saveThread, (_e, folder: string, filePath: string, messages: ThreadMessage[]) =>
     history.saveThread(folder, filePath, messages))
   ipcMain.handle(CH.loadRules, (_e, folder: string) => history.loadRules(folder))
+  ipcMain.handle(CH.saveRules, (_e, folder: string, content: string) => history.saveRules(folder, content))
   ipcMain.handle(CH.llmStart, (e, args: { provider: ProviderId; model: string; messages: LlmMessage[] }) => {
     const runId = nextRunId++
     activeRuns.set(runId, { aborted: false })
