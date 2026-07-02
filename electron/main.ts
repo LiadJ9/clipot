@@ -2,8 +2,10 @@ import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
 import { join } from 'node:path'
 import chokidar from 'chokidar'
 import { CH } from './shared/ipc'
+import type { ThreadMessage } from './shared/ipc'
 import * as files from './services/files'
 import * as vault from './services/vault'
+import * as history from './services/history'
 import type { ProviderId } from './services/vault'
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL
@@ -59,6 +61,13 @@ function registerIpc() {
     vault.saveStore(app.getPath('userData'), safeStorage, next)
     keyStore = next
   })
+  ipcMain.handle(CH.checkpoint, (_e, folder: string, filePath: string, source: string, promptSlug: string) =>
+    history.checkpoint(folder, filePath, source, promptSlug))
+  ipcMain.handle(CH.listCheckpoints, (_e, folder: string, filePath: string) => history.listCheckpoints(folder, filePath))
+  ipcMain.handle(CH.loadThread, (_e, folder: string, filePath: string) => history.loadThread(folder, filePath))
+  ipcMain.handle(CH.saveThread, (_e, folder: string, filePath: string, messages: ThreadMessage[]) =>
+    history.saveThread(folder, filePath, messages))
+  ipcMain.handle(CH.loadRules, (_e, folder: string) => history.loadRules(folder))
 }
 
 function createWindow() {

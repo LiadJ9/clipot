@@ -19,5 +19,10 @@ const api: ClipotApi = {
   },
   keyStatus: () => ipcRenderer.invoke(CH.keyStatus),
   setKey: (provider, value) => ipcRenderer.invoke(CH.setKey, provider, value),
+  checkpoint: (folder, filePath, source, promptSlug) => ipcRenderer.invoke(CH.checkpoint, folder, filePath, source, promptSlug),
+  listCheckpoints: (folder, filePath) => ipcRenderer.invoke(CH.listCheckpoints, folder, filePath),
+  loadThread: (folder, filePath) => ipcRenderer.invoke(CH.loadThread, folder, filePath),
+  saveThread: (folder, filePath, messages) => ipcRenderer.invoke(CH.saveThread, folder, filePath, messages),
+  loadRules: (folder) => ipcRenderer.invoke(CH.loadRules, folder),
 }
 contextBridge.exposeInMainWorld('clipot', api)

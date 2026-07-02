@@ -1,6 +1,8 @@
 import type { TreeNode } from '../services/files'
 import type { ProviderId } from '../services/vault'
 
+export type ThreadMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+
 export const CH = {
   pickFolder: 'files:pickFolder',
   readTree: 'files:readTree',
@@ -15,6 +17,11 @@ export const CH = {
   treeChanged: 'files:treeChanged',
   keyStatus: 'vault:keyStatus',
   setKey: 'vault:setKey',
+  checkpoint: 'history:checkpoint',
+  listCheckpoints: 'history:listCheckpoints',
+  loadThread: 'history:loadThread',
+  saveThread: 'history:saveThread',
+  loadRules: 'history:loadRules',
 } as const
 
 export interface ClipotApi {
@@ -31,6 +38,11 @@ export interface ClipotApi {
   onTreeChanged(cb: () => void): () => void
   keyStatus(): Promise<Record<ProviderId, boolean>>
   setKey(provider: ProviderId, value: string): Promise<void>
+  checkpoint(folder: string, filePath: string, source: string, promptSlug: string): Promise<string>
+  listCheckpoints(folder: string, filePath: string): Promise<{ path: string; label: string }[]>
+  loadThread(folder: string, filePath: string): Promise<ThreadMessage[]>
+  saveThread(folder: string, filePath: string, messages: ThreadMessage[]): Promise<void>
+  loadRules(folder: string): Promise<string | null>
 }
 
 declare global {
