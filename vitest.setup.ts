@@ -1,35 +1,45 @@
-// Polyfill CSS.escape for jsdom if not available
+// Polyfill CSS.escape for jsdom (Electron/Chromium provides it natively at runtime).
+// Canonical algorithm (https://drafts.csswg.org/cssom/#serialize-an-identifier).
 if (typeof CSS === 'undefined' || typeof CSS.escape !== 'function') {
-  globalThis.CSS = globalThis.CSS || {}
-  globalThis.CSS.escape = function (ident: string): string {
-    // CSS.escape implementation per spec
+  globalThis.CSS = globalThis.CSS || ({} as typeof CSS)
+  globalThis.CSS.escape = function (value: string): string {
+    const string = String(value)
+    const length = string.length
+    let index = -1
     let result = ''
-    let i = 0
-    while (i < ident.length) {
-      const code = ident.charCodeAt(i)
-      // If first char is digit, escape it
-      if (i === 0 && code >= 48 && code <= 57) {
-        result += '\\' + String.fromCharCode(code)
-      } else if (code === 0) {
-        // Null character
+    const firstCodeUnit = string.charCodeAt(0)
+
+    if (length === 1 && firstCodeUnit === 0x002d) {
+      return '\\' + string
+    }
+
+    while (++index < length) {
+      const codeUnit = string.charCodeAt(index)
+      if (codeUnit === 0x0000) {
         result += '�'
-      } else if (
-        code >= 1 &&
-        code <= 31 &&
-        code !== 9
-      ) {
-        // Control chars except tab
-        result += '\\' + code.toString(16).padStart(1, '0') + ' '
-      } else if (code === 34 || code === 39 || code === 40 || code === 41 || code === 44) {
-        // Quote, backslash, parens, comma
-        result += '\\' + ident[i]
-      } else if (i === 0 && ident.length === 1 && code === 45) {
-        // Single hyphen
-        result += '\\-'
-      } else {
-        result += ident[i]
+        continue
       }
-      i++
+      if (
+        (codeUnit >= 0x0001 && codeUnit <= 0x001f) ||
+        codeUnit === 0x007f ||
+        (index === 0 && codeUnit >= 0x0030 && codeUnit <= 0x0039) ||
+        (index === 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit === 0x002d)
+      ) {
+        result += '\\' + codeUnit.toString(16) + ' '
+        continue
+      }
+      if (
+        codeUnit >= 0x0080 ||
+        codeUnit === 0x002d ||
+        codeUnit === 0x005f ||
+        (codeUnit >= 0x0030 && codeUnit <= 0x0039) ||
+        (codeUnit >= 0x0041 && codeUnit <= 0x005a) ||
+        (codeUnit >= 0x0061 && codeUnit <= 0x007a)
+      ) {
+        result += string.charAt(index)
+        continue
+      }
+      result += '\\' + string.charAt(index)
     }
     return result
   }
