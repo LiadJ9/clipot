@@ -196,6 +196,12 @@ export default function CanvasView() {
   // Finds every stamped element intersecting the drag rect, ensures each has an id,
   // adds it as a selection, then kicks off (async, best-effort) rasterization of the crop.
   function finishRegionDrag(start: { x: number; y: number }, end: { x: number; y: number }) {
+    suppressClickRef.current = true
+    // Self-clearing: a synthetic click (if any) fires synchronously before this
+    // macrotask, so the flag can never persist past the current gesture. Armed
+    // unconditionally so a plain click in region mode also eats its trailing click.
+    setTimeout(() => { suppressClickRef.current = false }, 0)
+
     const root = rootRef.current
     useStore.setState({ regionMode: false })
     if (!root) return
@@ -250,12 +256,6 @@ export default function CanvasView() {
       window.removeEventListener('mouseup', onUp)
       const end = { x: ev.clientX, y: ev.clientY }
       setDragRect(null)
-      if (isRealDrag(start, end)) {
-        suppressClickRef.current = true
-        // Self-clearing: a synthetic click (if any) fires synchronously before this
-        // macrotask, so the flag can never persist past the current gesture.
-        setTimeout(() => { suppressClickRef.current = false }, 0)
-      }
       finishRegionDrag(start, end)
     }
     window.addEventListener('mousemove', onMove)
