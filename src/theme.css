@@ -1,0 +1,35 @@
+@font-face { font-family: 'Space Grotesk'; src: url('/assets/fonts/space-grotesk-400.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Space Grotesk'; src: url('/assets/fonts/space-grotesk-600.woff2') format('woff2'); font-weight: 600; }
+@font-face { font-family: 'Space Grotesk'; src: url('/assets/fonts/space-grotesk-700.woff2') format('woff2'); font-weight: 700; }
+@font-face { font-family: 'JetBrains Mono'; src: url('/assets/fonts/jetbrains-mono-400.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'JetBrains Mono'; src: url('/assets/fonts/jetbrains-mono-600.woff2') format('woff2'); font-weight: 600; }
+
+:root {
+  --bg:#0e0b08; --panel:#120e0a; --panel-2:#1a1410; --canvas-bg:#171209;
+  --border:#1e1811; --text:#ece5dc; --text-dim:#b9ac9d; --text-ghost:#7d7266;
+  --accent:#e8833a; --accent-soft:#f0b98a; --rind:#b85c1f; --pith:#f2d4ad;
+  --chip-fill:#31200e; --chip-border:#a05e24; --tag-fill:#152112; --tag-border:#4f7a45;
+  --font-ui:'Space Grotesk', system-ui, sans-serif;
+  --font-mono:'JetBrains Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 13px; }
+
+button { border: none; background: transparent; color: var(--text-dim); font: inherit;
+  border-radius: 6px; padding: 5px 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+button:hover { background: var(--panel-2); color: var(--text); }
+
+.app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.titlebar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.titlebar .name { font-weight: 700; letter-spacing: .4px; }
+.body { display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
+.sidebar { background: var(--panel); border-right: 1px solid var(--border); overflow: auto; }
+.main { display: grid; grid-template-rows: auto 1fr auto auto; min-height: 0; }
+.canvas-wrap { background: var(--canvas-bg); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.surface { background: #fff; border-radius: 6px; box-shadow: 0 4px 18px rgba(0,0,0,.55); }
+.chip { background: var(--chip-fill); border: 2px solid var(--chip-border); color: var(--accent-soft);
+  border-radius: 6px; padding: 1px 7px; font-family: var(--font-mono); font-weight: 600; font-size: 11px; }
+.edit-tag { background: var(--tag-fill); border: 2px solid var(--tag-border); color: #a8d99b;
+  border-radius: 6px; padding: 0 6px; font-family: var(--font-mono); font-size: 11px; display: inline-flex; gap: 4px; align-items: center; }
