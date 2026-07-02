@@ -5,7 +5,7 @@ export type ClickAction =
   | { kind: 'select'; path: number[] }
   | { kind: 'none' }
 
-const PATH_ATTR = 'data-clipot-path'
+export const PATH_ATTR = 'data-clipot-path'
 
 // Stamps every descendant of root with its original child-index path from
 // root, so clicks can be mapped back even after live-DOM reordering.
@@ -38,4 +38,11 @@ export function resolveClick(root: Element, target: Element, selections: Selecti
   if (!attr) return { kind: 'none' }
   const path = attr.split('/').map(Number)
   return { kind: 'select', path }
+}
+
+export type Rect = { left: number; top: number; right: number; bottom: number }
+
+// Strict inequalities: rects that only touch at an edge don't "intersect" (zero overlap area).
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 }

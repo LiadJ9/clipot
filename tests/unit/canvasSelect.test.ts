@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveClick, stampPaths } from '@/lib/canvasSelect'
+import { resolveClick, stampPaths, rectsIntersect } from '@/lib/canvasSelect'
 import type { Selection } from '@/lib/selection'
 
 function parse(source: string): SVGSVGElement {
@@ -38,5 +38,32 @@ describe('resolveClick', () => {
     const root = parse(`<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>`)
     stampPaths(root)
     expect(resolveClick(root, root, [])).toEqual({ kind: 'none' })
+  })
+})
+
+describe('rectsIntersect', () => {
+  it('detects overlapping rects', () => {
+    const a = { left: 0, top: 0, right: 10, bottom: 10 }
+    const b = { left: 5, top: 5, right: 15, bottom: 15 }
+    expect(rectsIntersect(a, b)).toBe(true)
+  })
+
+  it('treats rects that only touch at an edge as non-intersecting', () => {
+    const a = { left: 0, top: 0, right: 10, bottom: 10 }
+    const b = { left: 10, top: 0, right: 20, bottom: 10 }
+    expect(rectsIntersect(a, b)).toBe(false)
+  })
+
+  it('returns false for fully disjoint rects', () => {
+    const a = { left: 0, top: 0, right: 10, bottom: 10 }
+    const b = { left: 20, top: 20, right: 30, bottom: 30 }
+    expect(rectsIntersect(a, b)).toBe(false)
+  })
+
+  it('detects a rect fully contained within another', () => {
+    const a = { left: 0, top: 0, right: 100, bottom: 100 }
+    const b = { left: 10, top: 10, right: 20, bottom: 20 }
+    expect(rectsIntersect(a, b)).toBe(true)
+    expect(rectsIntersect(b, a)).toBe(true)
   })
 })

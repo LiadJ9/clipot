@@ -38,6 +38,8 @@ input, textarea { font: inherit; }
   border-radius: 999px; min-width: 18px; height: 18px; padding: 0 5px; display: flex; align-items: center; justify-content: center;
   font-family: var(--font-mono); font-weight: 700; font-size: 11px; line-height: 1; pointer-events: none;
   box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.region-drag-rect { position: absolute; border: 1px dashed var(--accent); background: rgba(232,131,58,.15);
+  pointer-events: none; z-index: 5; }
 .chip { background: var(--chip-fill); border: 2px solid var(--chip-border); color: var(--accent-soft);
   border-radius: 6px; padding: 1px 7px; font-family: var(--font-mono); font-weight: 600; font-size: 11px; }
 .chip.stale { border-color: var(--warn); color: var(--warn); }
