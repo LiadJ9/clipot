@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveClick, stampPaths, rectsIntersect } from '@/lib/canvasSelect'
+import { resolveClick, stampPaths, rectsIntersect, keepLeafMost } from '@/lib/canvasSelect'
 import type { Selection } from '@/lib/selection'
 
 function parse(source: string): SVGSVGElement {
@@ -65,5 +65,30 @@ describe('rectsIntersect', () => {
     const b = { left: 10, top: 10, right: 20, bottom: 20 }
     expect(rectsIntersect(a, b)).toBe(true)
     expect(rectsIntersect(b, a)).toBe(true)
+  })
+})
+
+describe('keepLeafMost', () => {
+  it('drops a group in favor of its children', () => {
+    const root = parse(`<svg xmlns="http://www.w3.org/2000/svg"><g><path/><path/></g></svg>`)
+    const g = root.firstElementChild as Element
+    const children = Array.from(g.children)
+    expect(keepLeafMost([g, ...children])).toEqual(children)
+  })
+
+  it('keeps all elements when none is an ancestor of another', () => {
+    const root = parse(`<svg xmlns="http://www.w3.org/2000/svg"><rect/><circle/></svg>`)
+    const elements = Array.from(root.children)
+    expect(keepLeafMost(elements)).toEqual(elements)
+  })
+
+  it('drops nested ancestors at any depth, keeping only the deepest leaf', () => {
+    const root = parse(
+      `<svg xmlns="http://www.w3.org/2000/svg"><g><g><path/></g></g></svg>`
+    )
+    const outer = root.firstElementChild as Element
+    const inner = outer.firstElementChild as Element
+    const leaf = inner.firstElementChild as Element
+    expect(keepLeafMost([outer, inner, leaf])).toEqual([leaf])
   })
 })

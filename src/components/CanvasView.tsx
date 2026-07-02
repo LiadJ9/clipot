@@ -2,12 +2,18 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import { useStore } from '@/store/store'
 import { ensureId } from '@/lib/svgDoc'
 import { labelFor } from '@/lib/selection'
-import { resolveClick, stampPaths, rectsIntersect, PATH_ATTR, type Rect } from '@/lib/canvasSelect'
+import { resolveClick, stampPaths, rectsIntersect, keepLeafMost, PATH_ATTR, type Rect } from '@/lib/canvasSelect'
 
 type Bubble = { n: number; x: number; y: number }
 type DragRect = { x0: number; y0: number; x1: number; y1: number }
 
 const MIN_DRAG_PX = 3
+
+// A gesture only counts as a drag (vs. a plain click) once it clears MIN_DRAG_PX
+// on at least one axis.
+function isRealDrag(start: { x: number; y: number }, end: { x: number; y: number }): boolean {
+  return Math.abs(end.x - start.x) >= MIN_DRAG_PX || Math.abs(end.y - start.y) >= MIN_DRAG_PX
+}
 
 export function sanitize(root: SVGSVGElement) {
   root.querySelectorAll('script').forEach((n) => n.remove())
@@ -19,7 +25,7 @@ export function sanitize(root: SVGSVGElement) {
 // Top-left of an element's bbox, in viewport (client) coordinates.
 function bboxScreenPoint(root: SVGSVGElement, el: Element): { x: number; y: number } | null {
   if (!('getBBox' in el) || !('getScreenCTM' in el)) return null
-  const ge = el as unknown as SVGGraphicsElement
+  const ge = el as SVGGraphicsElement
   try {
     const ctm = ge.getScreenCTM()
     if (!ctm) return null
@@ -37,7 +43,7 @@ function bboxScreenPoint(root: SVGSVGElement, el: Element): { x: number; y: numb
 // Screen-space bounding rect of an element's bbox, in viewport (client) coordinates.
 function elementScreenRect(root: SVGSVGElement, el: Element): Rect | null {
   if (!('getBBox' in el) || !('getScreenCTM' in el)) return null
-  const ge = el as unknown as SVGGraphicsElement
+  const ge = el as SVGGraphicsElement
   try {
     const ctm = ge.getScreenCTM()
     if (!ctm) return null
@@ -200,15 +206,20 @@ export default function CanvasView() {
       right: Math.max(start.x, end.x),
       bottom: Math.max(start.y, end.y),
     }
-    if (dragBox.right - dragBox.left < MIN_DRAG_PX && dragBox.bottom - dragBox.top < MIN_DRAG_PX) return
+    if (!isRealDrag(start, end)) return
+
+    const intersecting: Element[] = []
+    for (const el of Array.from(root.querySelectorAll(`[${PATH_ATTR}]`))) {
+      const rect = elementScreenRect(root, el)
+      if (rect && rectsIntersect(dragBox, rect)) intersecting.push(el)
+    }
+    const leafMost = keepLeafMost(intersecting)
 
     const { source: startSource, addSelection: addSel, setSource: setSrc } = useStore.getState()
     let currentSource = startSource
     const ids: string[] = []
 
-    for (const el of Array.from(root.querySelectorAll(`[${PATH_ATTR}]`))) {
-      const rect = elementScreenRect(root, el)
-      if (!rect || !rectsIntersect(dragBox, rect)) continue
+    for (const el of leafMost) {
       const attr = el.getAttribute(PATH_ATTR)
       if (!attr) continue
       const path = attr.split('/').map(Number)
@@ -237,9 +248,15 @@ export default function CanvasView() {
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
-      suppressClickRef.current = true
+      const end = { x: ev.clientX, y: ev.clientY }
       setDragRect(null)
-      finishRegionDrag(start, { x: ev.clientX, y: ev.clientY })
+      if (isRealDrag(start, end)) {
+        suppressClickRef.current = true
+        // Self-clearing: a synthetic click (if any) fires synchronously before this
+        // macrotask, so the flag can never persist past the current gesture.
+        setTimeout(() => { suppressClickRef.current = false }, 0)
+      }
+      finishRegionDrag(start, end)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)

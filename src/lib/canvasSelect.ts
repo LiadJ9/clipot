@@ -46,3 +46,9 @@ export type Rect = { left: number; top: number; right: number; bottom: number }
 export function rectsIntersect(a: Rect, b: Rect): boolean {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 }
+
+// Drops any element that is an ancestor of another element in the list, so a
+// container and its children never both survive (matches click-select granularity).
+export function keepLeafMost(elements: Element[]): Element[] {
+  return elements.filter((e) => !elements.some((f) => e !== f && e.contains(f)))
+}
