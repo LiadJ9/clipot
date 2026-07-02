@@ -54,9 +54,10 @@ function registerIpc() {
     return status
   })
   ipcMain.handle(CH.setKey, (_e, provider: ProviderId, value: string) => {
-    keyStore = { ...keyStore, [provider]: value }
-    vault.saveStore(app.getPath('userData'), safeStorage, keyStore)
-    process.env[ENV_VAR[provider]] = value
+    if (!PROVIDERS.includes(provider)) throw new Error(`Unknown provider: ${provider}`)
+    const next = { ...keyStore, [provider]: value }
+    vault.saveStore(app.getPath('userData'), safeStorage, next)
+    keyStore = next
   })
 }
 
