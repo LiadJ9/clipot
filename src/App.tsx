@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import './theme.css'
-import logoUrl from '../assets/logo.svg'
-import { Plus } from 'lucide-react'
 import { useStore } from '@/store/store'
 import FileTree from './components/FileTree'
 import CanvasView from './components/CanvasView'
@@ -14,6 +12,7 @@ import ThreadDrawer from './components/ThreadDrawer'
 import SettingsModal from './components/SettingsModal'
 import RulesEditor from './components/RulesEditor'
 import PromptHost from './components/PromptHost'
+import TitleBar from './components/TitleBar'
 import { mainView } from '@/lib/mainView'
 
 export default function App() {
@@ -27,14 +26,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="titlebar">
-        <img src={logoUrl} width={18} height={18} alt="" />
-        <span className="name">clipot</span>
-        <div style={{ flex: 1 }} />
-        <button onClick={startNewFile} title="New SVG" style={{ background: 'var(--accent)', color: 'var(--bg)' }}>
-          <Plus size={16} />
-        </button>
-      </div>
+      <TitleBar onNewFile={startNewFile} />
       <div className="body">
         <aside className="sidebar" data-testid="sidebar"><FileTree /></aside>
         <div className="main">
