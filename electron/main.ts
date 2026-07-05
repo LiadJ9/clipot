@@ -197,6 +197,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     backgroundColor: '#0e0b08',
+    icon: join(app.getAppPath(), 'assets/icon.png'),
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
