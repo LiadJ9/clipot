@@ -2,7 +2,7 @@ import type { TreeNode } from '../services/files'
 import type { ProviderId } from '../services/vault'
 import type { LlmMessage } from '../services/llm/types'
 
-export type ThreadMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+export type ThreadMessage = { role: 'system' | 'user' | 'assistant'; content: string; error?: boolean }
 
 export const CH = {
   pickFolder: 'files:pickFolder',

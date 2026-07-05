@@ -213,7 +213,7 @@ export const useStore = create<State>((set, get) => ({
         prompt: extraNote ? `${prompt}\n\n${extraNote}` : prompt,
         selections: get().selections,
         rules,
-        history: priorThread,
+        history: priorThread.filter((m) => !m.error), // never resend failure notices as context
         regionIds: get().regionIds,
       })
       const messages: LlmMessage[] = built.map((m) => ({ role: m.role, content: m.content }))
@@ -293,11 +293,19 @@ export const useStore = create<State>((set, get) => ({
     }
     if (result.kind === 'error') {
       const msg = result.message
-      set({
-        error: /no api key/i.test(msg)
+      const isNoKey = /no api key/i.test(msg)
+      // Full provider error goes into the message log (scrollable); the activity
+      // strip only gets a short pointer since it's space-limited.
+      set((s) => ({
+        thread: [
+          ...s.thread,
+          { role: 'assistant', content: `${PROVIDER_LABELS[st.provider]} request failed:\n${msg}`, error: true },
+        ],
+        error: isNoKey
           ? `No API key set for ${PROVIDER_LABELS[st.provider]}. Add one in Settings.`
-          : `${PROVIDER_LABELS[st.provider]} request failed: ${msg.split('\n')[0].slice(0, 200)}`,
-      })
+          : `${PROVIDER_LABELS[st.provider]} request failed — see the message log.`,
+        threadOpen: true, // reveal the log so the full error is visible immediately
+      }))
     } else if (result.kind === 'retry') {
       set((s) => ({
         thread: [...s.thread, { role: 'assistant', content: 'Could not apply the requested change after 2 retries.' }],

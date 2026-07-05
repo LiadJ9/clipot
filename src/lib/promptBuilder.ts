@@ -1,7 +1,9 @@
 import { parseSvg } from './svgDoc'
 import type { Selection } from './selection'
 
-export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+// `error` marks a display-only failure notice in the thread log; such messages
+// are shown to the user but never sent back to the model as conversation history.
+export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string; error?: boolean }
 
 export const SIZE_CAP = 32 * 1024
 

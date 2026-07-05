@@ -51,6 +51,14 @@ export default function ThreadDrawer() {
       <div className="drawer-body">
         {thread.length === 0 && <div style={{ color: 'var(--text-ghost)', padding: 8 }}>No messages yet.</div>}
         {thread.map((m, i) => {
+          if (m.error) {
+            return (
+              <div key={i} className="thread-msg error">
+                <div className="thread-role">error</div>
+                <div className="thread-text thread-error-text">{m.content}</div>
+              </div>
+            )
+          }
           const edits = m.role === 'assistant' ? countEdits(m.content) : 0
           return (
             <div key={i} className={`thread-msg ${m.role}`}>

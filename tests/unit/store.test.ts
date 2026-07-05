@@ -98,7 +98,32 @@ describe('sendPrompt', () => {
     expect(startStream).toHaveBeenCalledTimes(1) // no retries for a provider error
     expect(s.error).toContain('Anthropic request failed')
     expect(s.thread.some((m) => m.content.includes('Could not apply'))).toBe(false)
+    // Full provider error is captured in the message log and the drawer is opened.
+    const errEntry = s.thread.find((m) => m.error)
+    expect(errEntry?.content).toContain('Anthropic 401: invalid x-api-key')
+    expect(s.threadOpen).toBe(true)
     expect(s.streaming).toBe(false)
+  })
+
+  it('does not resend a logged error entry to the provider as history', async () => {
+    const startStream = vi.fn((_args, h) => { h.onChunk(editReply); h.onDone(); return vi.fn() })
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      keyStatus: vi.fn().mockResolvedValue({ anthropic: true, openai: true, gemini: true, ollama: true }),
+      checkpoint: vi.fn().mockResolvedValue('cp'),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      saveThread: vi.fn().mockResolvedValue(undefined),
+      startStream,
+    }
+    // Seed a prior error entry in the thread, then send a new prompt.
+    useStore.setState({
+      folder: '/f', activePath: '/f/a.svg', source: svg, mode: 'edit', provider: 'anthropic', error: null,
+      thread: [{ role: 'assistant', content: 'Anthropic request failed:\n...', error: true }],
+    })
+
+    await useStore.getState().sendPrompt('make it blue')
+
+    const sent = startStream.mock.calls[0][0].messages as { content: string }[]
+    expect(sent.some((m) => m.content.includes('request failed'))).toBe(false)
   })
 })
 
