@@ -72,6 +72,18 @@ Runtime dependencies are kept deliberately small: `react`, `react-dom`, `zustand
 7. **Roll back to a checkpoint** by opening the thread drawer (chevron in the activity strip) and picking an earlier snapshot for the active file.
 8. **Create a new SVG from a prompt** with the `+` button in the titlebar — describe what you want, and clipot generates and saves a new file.
 
+## Choosing a model
+
+For the best SVG results, **claude-sonnet-5** is the strongest all-round choice — across independent evaluations (the SVGenius benchmark and SVGMaker's Claude-vs-ChatGPT test) Claude models consistently produce cleaner, better-structured SVG markup and higher editing accuracy than GPT or Gemini, which matters most for clipot's targeted, block-based edit workflow. If you don't have a preference, start there.
+
+- **Best quality:** claude-opus-4-8 — Anthropic's top model extends the same structural precision and editing accuracy Claude shows in the SVGenius benchmark to clipot's hardest, most detailed figures.
+- **Best value / speed:** gemini-2.5-flash — fast, cheap, and free-tier friendly for quick iterative edits; the Gemini family (2.5 Pro) also tops at least one head-to-head on visual *design* execution — a different axis from the code-structure and editing accuracy where Claude leads.
+- **Best local / offline (Ollama):** qwen2.5-coder — the de facto standard local coding model, well ahead of comparable Llama models on code-generation benchmarks, and the local baseline used in community SVG-generation tests.
+
+Model quality moves quickly; this reflects the landscape as of 2026-07. See the per-provider setup below to add a key.
+
+Sources: [[1]](https://simonwillison.net/2025/Nov/25/llm-svg-generation-benchmark/) Simon Willison's LLM SVG generation benchmark (9 frontier models, creative prompts), [[2]](https://arxiv.org/html/2506.03139v1) SVGenius: Benchmarking LLMs in SVG Understanding, Editing and Generation, [[3]](https://svgmaker.io/blogs/can-claude-or-chatgpt-generate-production-ready-svgs) SVGMaker: Can Claude or ChatGPT generate production-ready SVGs?, [[4]](https://diginate.com/blog/which-ai-models-make-the-best-vector-art/) Diginate: Which AI models make the best vector art?
+
 ## Quick start per provider
 
 API keys can be entered in the Settings modal (gear icon in the toolbar) or supplied via environment variables. Environment variables always take precedence over a saved key.
