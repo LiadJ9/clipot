@@ -81,9 +81,9 @@ API keys can be entered in the Settings modal (gear icon in the toolbar) or supp
 - Recommended model: `gpt-5.2`.
 
 ### Google Gemini
-- Get an API key from [Google AI Studio](https://aistudio.google.com/).
+- Get an API key from [Google AI Studio](https://aistudio.google.com/) — has a free tier.
 - Set it in Settings, or export `GEMINI_API_KEY`.
-- Recommended model: `gemini-3.0-pro`.
+- Recommended model: `gemini-2.5-flash` (fast and free-tier friendly).
 
 ### Ollama (local, offline)
 - [Install Ollama](https://ollama.com/) and make sure it's running.

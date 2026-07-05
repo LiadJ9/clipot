@@ -15,4 +15,10 @@ describe('vault.resolveKey', () => {
   it('maps ollama to OLLAMA_HOST', () => {
     expect(resolveKey('ollama', {}, { OLLAMA_HOST: 'http://localhost:11434' } as any)).toBe('http://localhost:11434')
   })
+  it('trims surrounding whitespace/newlines from a pasted key', () => {
+    expect(resolveKey('gemini', { gemini: '  AIzaKEY\n' }, {} as any)).toBe('AIzaKEY')
+  })
+  it('treats a whitespace-only key as no key', () => {
+    expect(resolveKey('gemini', { gemini: '   ' }, {} as any)).toBeNull()
+  })
 })

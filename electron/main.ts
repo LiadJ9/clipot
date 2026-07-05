@@ -25,7 +25,7 @@ const OLLAMA_DEFAULT_HOST = 'http://localhost:11434'
 const CURATED_MODELS: Partial<Record<ProviderId, string[]>> = {
   anthropic: ['claude-sonnet-5', 'claude-opus-4-8'],
   openai: ['gpt-5.2', 'gpt-5.1'],
-  gemini: ['gemini-3.0-pro', 'gemini-2.5-flash'],
+  gemini: ['gemini-2.5-flash', 'gemini-2.5-pro'],
 }
 
 let watcher: import('chokidar').FSWatcher | null = null

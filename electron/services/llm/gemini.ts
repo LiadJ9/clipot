@@ -18,10 +18,10 @@ export const gemini: Provider = {
       parts: [{ text: m.content }, ...(m.images ?? []).map((i) => ({ inline_data: { mime_type: i.mime, data: i.dataBase64 } }))],
     }))
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n')
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents }),
     })
     if (!res.ok || !res.body) throw new Error(`Gemini ${res.status}: ${await res.text()}`)

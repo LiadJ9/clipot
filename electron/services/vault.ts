@@ -12,7 +12,10 @@ const ENV_VAR: Record<ProviderId, string> = {
 }
 
 export function resolveKey(provider: ProviderId, store: KeyStore, env: NodeJS.ProcessEnv): string | null {
-  return env[ENV_VAR[provider]] ?? store[provider] ?? null
+  // Trim so a pasted key with a stray newline/space doesn't cause a 401.
+  const raw = env[ENV_VAR[provider]] ?? store[provider] ?? null
+  const trimmed = raw?.trim()
+  return trimmed ? trimmed : null
 }
 
 type SafeStorage = { encryptString(s: string): Buffer; decryptString(b: Buffer): string; isEncryptionAvailable(): boolean }
