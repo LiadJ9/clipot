@@ -42,7 +42,7 @@ function ModelPicker() {
         {provider}/{model} <ChevronDown size={12} />
       </button>
       {open && (
-        <div className="menu" style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4 }}>
+        <div className="menu" style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, maxHeight: '60vh', overflowY: 'auto' }}>
           <div style={{ display: 'flex', gap: 2, padding: '2px 2px 6px' }}>
             {PROVIDERS.map((p) => (
               <div

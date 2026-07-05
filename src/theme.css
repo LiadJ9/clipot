@@ -18,6 +18,14 @@
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 13px; }
 
+* { scrollbar-width: thin; scrollbar-color: var(--chip-border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--chip-border); border-radius: 999px;
+  border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--rind); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 button { border: none; background: transparent; color: var(--text-dim); font: inherit;
   border-radius: 6px; padding: 5px 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 button:hover { background: var(--panel-2); color: var(--text); }
@@ -69,8 +77,8 @@ input, textarea { font: inherit; }
   border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,.55); overflow: hidden; }
 .drawer-hd { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;
   background: var(--panel); border-bottom: 1px solid var(--border); font-weight: 600; }
-.drawer-body { overflow: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
-.drawer-checkpoints { border-top: 1px solid var(--border); padding: 6px; max-height: 30%; overflow: auto; }
+.drawer-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.drawer-checkpoints { flex: none; border-top: 1px solid var(--border); padding: 6px; max-height: 220px; overflow: auto; }
 .drawer-checkpoints .hd { padding: 4px 6px; color: var(--text-ghost); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
 
 .thread-msg { display: flex; flex-direction: column; gap: 4px; padding: 6px 9px; border-radius: 8px; font-size: 12px; }
