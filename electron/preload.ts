@@ -50,5 +50,8 @@ const api: ClipotApi = {
     }
   },
   listModels: (provider) => ipcRenderer.invoke(CH.listModels, provider),
+  watchFolder: (path) => ipcRenderer.invoke(CH.watchFolder, path),
+  loadPrefs: () => ipcRenderer.invoke(CH.loadPrefs),
+  savePrefs: (prefs) => ipcRenderer.invoke(CH.savePrefs, prefs),
 }
 contextBridge.exposeInMainWorld('clipot', api)

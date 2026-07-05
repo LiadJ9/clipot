@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './theme.css'
 import logoUrl from '../assets/logo.svg'
 import { Plus } from 'lucide-react'
@@ -17,6 +17,9 @@ export default function App() {
   const { mode, startNewFile } = useStore()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
+
+  // Restore last session (provider/model + last folder and active file) on launch.
+  useEffect(() => { void useStore.getState().init() }, [])
 
   return (
     <div className="app">

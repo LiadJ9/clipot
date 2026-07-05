@@ -8,6 +8,7 @@ import type { ThreadMessage } from './shared/ipc'
 import * as files from './services/files'
 import * as vault from './services/vault'
 import * as history from './services/history'
+import * as prefs from './services/prefs'
 import { PROVIDERS as LLM_PROVIDERS } from './services/llm'
 import { listOllamaModels } from './services/llm/ollama'
 import type { LlmMessage } from './services/llm/types'
@@ -89,6 +90,15 @@ async function runStream(
 
 const currentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
 
+// Mark a folder as the opened root (for the assertInside guard) and watch it for
+// changes. Shared by the folder picker and by restoring the last folder on boot.
+function startWatching(folderPath: string) {
+  openedFolder = resolve(folderPath)
+  watcher?.close()
+  watcher = chokidar.watch(folderPath, { ignoreInitial: true, ignored: /(^|[/\\])\.clipot/ })
+  watcher.on('all', () => currentWindow()?.webContents.send(CH.treeChanged))
+}
+
 function loadVaultIntoEnv() {
   keyStore = vault.loadStore(app.getPath('userData'), safeStorage)
   for (const provider of PROVIDERS) {
@@ -111,12 +121,12 @@ function registerIpc() {
       if (r.canceled || !r.filePaths[0]) return null
       folderPath = r.filePaths[0]
     }
-    openedFolder = resolve(folderPath)
-    watcher?.close()
-    watcher = chokidar.watch(folderPath, { ignoreInitial: true, ignored: /(^|[/\\])\.clipot/ })
-    watcher.on('all', () => currentWindow()?.webContents.send(CH.treeChanged))
+    startWatching(folderPath)
     return folderPath
   })
+  ipcMain.handle(CH.watchFolder, (_e, p: string) => startWatching(p))
+  ipcMain.handle(CH.loadPrefs, () => prefs.loadPrefs(app.getPath('userData')))
+  ipcMain.handle(CH.savePrefs, (_e, p: prefs.Prefs) => prefs.savePrefs(app.getPath('userData'), p))
   ipcMain.handle(CH.readTree, (_e, root: string) => { assertInside(root); return files.readTree(root) })
   ipcMain.handle(CH.readFile, (_e, p: string) => { assertInside(p); return files.readFile(p) })
   ipcMain.handle(CH.writeFile, (_e, p: string, c: string) => { assertInside(p); return files.writeFileAtomic(p, c) })

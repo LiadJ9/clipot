@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { TreeNode } from '../../electron/shared/ipc'
+import type { TreeNode, Prefs } from '../../electron/shared/ipc'
 import type { Selection } from '@/lib/selection'
 import type { ChatMessage } from '@/lib/promptBuilder'
 import type { ProviderId } from '../../electron/services/llm/types'
@@ -12,6 +12,28 @@ import { createUndoStack } from '@/lib/undoStack'
 
 // Module-level undo stack, rebound whenever the active document changes.
 let undo = createUndoStack('')
+
+// Best-effort persistence of non-secret session prefs (provider/model/folder/active file).
+function persistPrefs(s: { provider: ProviderId; model: string; folder: string | null; activePath: string | null }) {
+  try {
+    void window.clipot.savePrefs({
+      provider: s.provider,
+      model: s.model,
+      folder: s.folder ?? undefined,
+      activePath: s.activePath ?? undefined,
+    })
+  } catch {
+    // prefs are non-critical; ignore failures
+  }
+}
+
+// Watch + read a folder's tree and rules. Shared by opening a folder and restoring one on boot.
+async function fetchFolder(folder: string): Promise<{ tree: TreeNode; rules: string }> {
+  await window.clipot.watchFolder(folder)
+  const tree = await window.clipot.readTree(folder)
+  const rules = (await window.clipot.loadRules(folder)) ?? ''
+  return { tree, rules }
+}
 
 // Human-readable provider names for user-facing error messages.
 const PROVIDER_LABELS: Record<ProviderId, string> = {
@@ -90,6 +112,7 @@ type State = {
   toggleRegionMode(): void
   toggleThread(): void
   startNewFile(): void
+  init(): Promise<void>
   openFolder(): Promise<void>
   refreshTree(): Promise<void>
   openFile(path: string): Promise<void>
@@ -137,22 +160,45 @@ export const useStore = create<State>((set, get) => ({
     const ap = get().activePath
     if (ap) void writeSource(ap, content, set)
   },
-  setModel(provider, model) { set({ provider, model }) },
+  setModel(provider, model) { set({ provider, model }); persistPrefs(get()) },
   setRules(r) { set({ rules: r }) },
   toggleRegionMode() { set((s) => ({ regionMode: !s.regionMode })) },
   toggleThread() { set((s) => ({ threadOpen: !s.threadOpen })) },
   startNewFile() {
     undo = createUndoStack('')
     set({ mode: 'new', activePath: null, source: '', selections: [], thread: [] })
+    persistPrefs(get())
   },
 
+  async init() {
+    let p: Prefs
+    try {
+      p = await window.clipot.loadPrefs()
+    } catch {
+      return
+    }
+    if (p.provider && p.model) set({ provider: p.provider, model: p.model })
+    if (p.folder) {
+      try {
+        const { tree, rules } = await fetchFolder(p.folder)
+        set({ folder: p.folder, tree, rules })
+        window.clipot.onTreeChanged(() => get().refreshTree())
+        if (p.activePath && pathExists(tree, p.activePath)) {
+          await get().openFile(p.activePath)
+        }
+      } catch {
+        // Saved folder is gone/inaccessible — start fresh without it.
+      }
+    }
+  },
   async openFolder() {
     const folder = await window.clipot.pickFolder()
     if (!folder) return
-    const tree = await window.clipot.readTree(folder)
-    const rules = (await window.clipot.loadRules(folder)) ?? ''
-    set({ folder, tree, rules })
+    const { tree, rules } = await fetchFolder(folder)
+    undo = createUndoStack('')
+    set({ folder, tree, rules, activePath: null, source: '', selections: [], thread: [], mode: 'edit' })
     window.clipot.onTreeChanged(() => get().refreshTree())
+    persistPrefs(get())
   },
   async refreshTree() {
     const f = get().folder
@@ -162,6 +208,7 @@ export const useStore = create<State>((set, get) => ({
     const { activePath } = get()
     if (activePath && !pathExists(tree, activePath)) {
       set({ activePath: null, source: '', selections: [], thread: [] })
+      persistPrefs(get())
     }
   },
   async openFile(path) {
@@ -169,6 +216,7 @@ export const useStore = create<State>((set, get) => ({
     const thread = get().folder ? await window.clipot.loadThread(get().folder!, path) : []
     undo = createUndoStack(source)
     set({ activePath: path, source, selections: [], thread, mode: 'edit' })
+    persistPrefs(get())
   },
 
   async sendPrompt(prompt) {

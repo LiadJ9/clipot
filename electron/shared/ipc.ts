@@ -1,7 +1,9 @@
 import type { TreeNode } from '../services/files'
 import type { ProviderId } from '../services/vault'
 import type { LlmMessage } from '../services/llm/types'
+import type { Prefs } from '../services/prefs'
 
+export type { Prefs } from '../services/prefs'
 export type ThreadMessage = { role: 'system' | 'user' | 'assistant'; content: string; error?: boolean }
 
 export const CH = {
@@ -30,6 +32,9 @@ export const CH = {
   llmDone: 'llm:done',
   llmError: 'llm:error',
   listModels: 'llm:listModels',
+  watchFolder: 'files:watchFolder',
+  loadPrefs: 'prefs:load',
+  savePrefs: 'prefs:save',
 } as const
 
 export interface ClipotApi {
@@ -57,6 +62,9 @@ export interface ClipotApi {
     handlers: { onChunk: (text: string) => void; onDone: () => void; onError: (message: string) => void }
   ): () => void
   listModels(provider: ProviderId): Promise<string[]>
+  watchFolder(path: string): Promise<void>
+  loadPrefs(): Promise<Prefs>
+  savePrefs(prefs: Prefs): Promise<void>
 }
 
 declare global {

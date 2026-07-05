@@ -144,6 +144,7 @@ describe('autosave debounce and undo race', () => {
     let done: () => void = () => {}
     ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
       keyStatus: vi.fn().mockResolvedValue({ anthropic: true, openai: true, gemini: true, ollama: true }),
+      savePrefs: vi.fn().mockResolvedValue(undefined),
       checkpoint: vi.fn().mockResolvedValue('cp'),
       writeFile,
       saveThread: vi.fn().mockResolvedValue(undefined),
@@ -222,5 +223,67 @@ describe('pathExists', () => {
   })
   it('returns false for a null tree', () => {
     expect(pathExists(null, '/root/a.svg')).toBe(false)
+  })
+})
+
+describe('init (session restore)', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>'
+  const tree = { name: 'f', path: '/f', kind: 'dir', children: [{ name: 'a.svg', path: '/f/a.svg', kind: 'file' }] }
+
+  beforeEach(() => {
+    useStore.setState({
+      provider: 'anthropic', model: 'claude-sonnet-5',
+      folder: null, tree: null, activePath: null, source: '', rules: '', thread: [],
+    })
+  })
+
+  it('restores provider/model and reopens the last folder + active file', async () => {
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      loadPrefs: vi.fn().mockResolvedValue({ provider: 'gemini', model: 'gemini-2.5-flash', folder: '/f', activePath: '/f/a.svg' }),
+      watchFolder: vi.fn().mockResolvedValue(undefined),
+      readTree: vi.fn().mockResolvedValue(tree),
+      loadRules: vi.fn().mockResolvedValue('my rules'),
+      readFile: vi.fn().mockResolvedValue(svg),
+      loadThread: vi.fn().mockResolvedValue([]),
+      onTreeChanged: vi.fn(() => () => {}),
+      savePrefs: vi.fn().mockResolvedValue(undefined),
+    }
+
+    await useStore.getState().init()
+
+    const s = useStore.getState()
+    expect(s.provider).toBe('gemini')
+    expect(s.model).toBe('gemini-2.5-flash')
+    expect(s.folder).toBe('/f')
+    expect(s.rules).toBe('my rules')
+    expect(s.activePath).toBe('/f/a.svg')
+    expect(s.source).toBe(svg)
+  })
+
+  it('reopens the folder but not a saved active file that no longer exists', async () => {
+    const readFile = vi.fn()
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      loadPrefs: vi.fn().mockResolvedValue({ provider: 'openai', model: 'gpt-5.2', folder: '/f', activePath: '/f/gone.svg' }),
+      watchFolder: vi.fn().mockResolvedValue(undefined),
+      readTree: vi.fn().mockResolvedValue({ name: 'f', path: '/f', kind: 'dir', children: [] }),
+      loadRules: vi.fn().mockResolvedValue(''),
+      onTreeChanged: vi.fn(() => () => {}),
+      readFile,
+    }
+
+    await useStore.getState().init()
+
+    const s = useStore.getState()
+    expect(s.folder).toBe('/f')
+    expect(s.activePath).toBeNull()
+    expect(readFile).not.toHaveBeenCalled()
+  })
+
+  it('starts fresh (no crash) when loadPrefs is empty', async () => {
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      loadPrefs: vi.fn().mockResolvedValue({}),
+    }
+    await useStore.getState().init()
+    expect(useStore.getState().folder).toBeNull()
   })
 })

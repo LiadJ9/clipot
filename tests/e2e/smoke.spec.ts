@@ -17,7 +17,9 @@ test('recolors a selected element via a mocked LLM stream and saves it to disk',
   let electronApp: ElectronApplication | null = null
   try {
     electronApp = await electron.launch({
-      args: ['.', '--no-sandbox'],
+      // Isolate userData (keys, prefs) to a temp dir so the test is deterministic
+      // and unaffected by any real session prefs on this machine.
+      args: ['.', '--no-sandbox', `--user-data-dir=${join(dir, 'userdata')}`],
       env: {
         ...process.env,
         CLIPOT_MOCK_LLM: mockPath,
