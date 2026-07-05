@@ -30,6 +30,7 @@ describe('sendPrompt', () => {
     const stop = vi.fn()
     const startStream = vi.fn((_args, h) => { h.onChunk(editReply); h.onDone(); return stop })
     ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      keyStatus: vi.fn().mockResolvedValue({ anthropic: true, openai: true, gemini: true, ollama: true }),
       checkpoint: vi.fn().mockResolvedValue('cp'),
       writeFile: vi.fn().mockResolvedValue(undefined),
       saveThread,
@@ -37,7 +38,7 @@ describe('sendPrompt', () => {
     }
     useStore.setState({
       folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit',
-      regionImage: 'data:image/png;base64,AAA', regionIds: ['clipot-1'],
+      provider: 'anthropic', regionImage: 'data:image/png;base64,AAA', regionIds: ['clipot-1'],
     })
 
     await useStore.getState().sendPrompt('make it blue')
@@ -47,12 +48,57 @@ describe('sendPrompt', () => {
     expect(s.editCount).toEqual({ done: 1, total: 1 })
     expect(s.thread.map((m) => m.role)).toEqual(['user', 'assistant'])
     expect(s.streaming).toBe(false)
+    expect(s.error).toBeNull()
     expect(s.regionImage).toBeNull()
     expect(s.regionIds).toEqual([])
     expect(saveThread).toHaveBeenCalledWith('/f', '/f/a.svg', s.thread)
     expect(startStream.mock.calls[0][0].messages.at(-1).images).toEqual([
       { mime: 'image/png', dataBase64: 'AAA' },
     ])
+  })
+
+  it('does not stream, checkpoint, or add thread noise when the provider has no API key', async () => {
+    const startStream = vi.fn()
+    const checkpoint = vi.fn().mockResolvedValue('cp')
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      keyStatus: vi.fn().mockResolvedValue({ anthropic: false, openai: false, gemini: false, ollama: false }),
+      checkpoint,
+      startStream,
+      saveThread: vi.fn().mockResolvedValue(undefined),
+    }
+    useStore.setState({
+      folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit',
+      provider: 'anthropic', error: null,
+    })
+
+    await useStore.getState().sendPrompt('make it blue')
+
+    const s = useStore.getState()
+    expect(s.error).toBe('No API key set for Anthropic. Add one in Settings.')
+    expect(startStream).not.toHaveBeenCalled()
+    expect(checkpoint).not.toHaveBeenCalled()
+    expect(s.thread).toEqual([]) // no user/assistant bubbles added
+    expect(s.streaming).toBe(false)
+  })
+
+  it('surfaces a stream error without retrying and without a misleading edit-failure message', async () => {
+    const startStream = vi.fn((_args, h) => { h.onError('Anthropic 401: invalid x-api-key'); return vi.fn() })
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      keyStatus: vi.fn().mockResolvedValue({ anthropic: true, openai: true, gemini: true, ollama: true }),
+      checkpoint: vi.fn().mockResolvedValue('cp'),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      saveThread: vi.fn().mockResolvedValue(undefined),
+      startStream,
+    }
+    useStore.setState({ folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit', provider: 'anthropic', error: null })
+
+    await useStore.getState().sendPrompt('make it blue')
+
+    const s = useStore.getState()
+    expect(startStream).toHaveBeenCalledTimes(1) // no retries for a provider error
+    expect(s.error).toContain('Anthropic request failed')
+    expect(s.thread.some((m) => m.content.includes('Could not apply'))).toBe(false)
+    expect(s.streaming).toBe(false)
   })
 })
 
@@ -72,6 +118,7 @@ describe('autosave debounce and undo race', () => {
     const writeFile = vi.fn().mockResolvedValue(undefined)
     let done: () => void = () => {}
     ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = {
+      keyStatus: vi.fn().mockResolvedValue({ anthropic: true, openai: true, gemini: true, ollama: true }),
       checkpoint: vi.fn().mockResolvedValue('cp'),
       writeFile,
       saveThread: vi.fn().mockResolvedValue(undefined),

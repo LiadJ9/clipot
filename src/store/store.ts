@@ -13,6 +13,14 @@ import { createUndoStack } from '@/lib/undoStack'
 // Module-level undo stack, rebound whenever the active document changes.
 let undo = createUndoStack('')
 
+// Human-readable provider names for user-facing error messages.
+const PROVIDER_LABELS: Record<ProviderId, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  gemini: 'Google Gemini',
+  ollama: 'Ollama',
+}
+
 // Minimal shape of zustand's setter we need for error reporting.
 type SetError = (partial: Partial<State>) => void
 
@@ -167,6 +175,23 @@ export const useStore = create<State>((set, get) => ({
     const st = get()
     if (st.streaming) return
     if (!st.activePath && st.mode !== 'new') return
+
+    // Fail fast if the chosen provider has no key (Ollama uses a local host, so
+    // it needs none). Avoids a pointless checkpoint + stream + retry cycle and
+    // gives the user an actionable message instead of a generic edit failure.
+    if (st.provider !== 'ollama') {
+      let hasKey = true
+      try {
+        hasKey = !!(await window.clipot.keyStatus())[st.provider]
+      } catch {
+        hasKey = true // status check failed; let the stream error path report any real problem
+      }
+      if (!hasKey) {
+        set({ error: `No API key set for ${PROVIDER_LABELS[st.provider]}. Add one in Settings.` })
+        return
+      }
+    }
+
     const folder = st.folder!
     const rules = st.rules || DEFAULT_RULES
     const priorThread = st.thread
@@ -181,7 +206,8 @@ export const useStore = create<State>((set, get) => ({
     const baseThread: ChatMessage[] = [...priorThread, { role: 'user', content: prompt }]
     set({ streaming: true, activity: '', thread: baseThread, editCount: { done: 0, total: 0 }, error: null })
 
-    const attempt = async (extraNote?: string): Promise<'ok' | 'retry'> => {
+    type AttemptResult = { kind: 'ok' } | { kind: 'retry' } | { kind: 'error'; message: string }
+    const attempt = async (extraNote?: string): Promise<AttemptResult> => {
       const built = buildMessages({
         source: get().source,
         prompt: extraNote ? `${prompt}\n\n${extraNote}` : prompt,
@@ -200,6 +226,7 @@ export const useStore = create<State>((set, get) => ({
       const parser = createEditParser()
       let assistantText = ''
       let failure: { detail: string } | null = null
+      let streamError: string | null = null
 
       await new Promise<void>((resolve) => {
         const stop = window.clipot.startStream(
@@ -236,7 +263,7 @@ export const useStore = create<State>((set, get) => ({
             },
             onDone: () => resolve(),
             onError: (msg: string) => {
-              failure = { detail: msg }
+              streamError = msg
               resolve()
             },
           },
@@ -249,17 +276,29 @@ export const useStore = create<State>((set, get) => ({
       } catch (e) {
         if (e instanceof IncompleteBlockError) failure = { detail: 'Incomplete edit block' }
       }
-      set((s) => ({ thread: [...s.thread, { role: 'assistant', content: assistantText }] }))
-      return failure ? 'retry' : 'ok'
+      if (assistantText.trim()) {
+        set((s) => ({ thread: [...s.thread, { role: 'assistant', content: assistantText }] }))
+      }
+      if (streamError) return { kind: 'error', message: streamError }
+      return failure ? { kind: 'retry' } : { kind: 'ok' }
     }
 
     let result = await attempt()
-    for (let i = 0; i < 2 && result === 'retry'; i++) {
+    // Only edit-apply failures are retried; a stream/provider error (bad key,
+    // auth, network) won't be fixed by retrying, so it exits the loop at once.
+    for (let i = 0; i < 2 && result.kind === 'retry'; i++) {
       result = await attempt(
         'The previous edit could not be applied (SEARCH text did not match or produced invalid SVG). Re-read the current file and try again.',
       )
     }
-    if (result === 'retry') {
+    if (result.kind === 'error') {
+      const msg = result.message
+      set({
+        error: /no api key/i.test(msg)
+          ? `No API key set for ${PROVIDER_LABELS[st.provider]}. Add one in Settings.`
+          : `${PROVIDER_LABELS[st.provider]} request failed: ${msg.split('\n')[0].slice(0, 200)}`,
+      })
+    } else if (result.kind === 'retry') {
       set((s) => ({
         thread: [...s.thread, { role: 'assistant', content: 'Could not apply the requested change after 2 retries.' }],
       }))

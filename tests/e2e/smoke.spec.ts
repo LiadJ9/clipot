@@ -23,6 +23,9 @@ test('recolors a selected element via a mocked LLM stream and saves it to disk',
         CLIPOT_MOCK_LLM: mockPath,
         CLIPOT_TEST_FOLDER: dir,
         NODE_ENV: 'production',
+        // A configured key is a real precondition for sending; the mock stream
+        // ignores it, but the renderer's no-key guard requires one to be present.
+        ANTHROPIC_API_KEY: 'test-key-not-used-by-mock',
       },
     })
 
