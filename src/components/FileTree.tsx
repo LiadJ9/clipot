@@ -97,8 +97,12 @@ export default function FileTree() {
       <div className="hd" style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 11px', color: 'var(--text-ghost)', fontSize: 9, letterSpacing: 1, textTransform: 'uppercase' }}>
         <span>Files</span>
         <span style={{ display: 'flex', gap: 8 }}>
-          <FilePlus size={12} style={{ cursor: 'pointer' }} onClick={() => newAtRoot('newFile')} />
-          <FolderPlus size={12} style={{ cursor: 'pointer' }} onClick={() => newAtRoot('newFolder')} />
+          <span title="New file" style={{ display: 'inline-flex' }}>
+            <FilePlus size={12} style={{ cursor: 'pointer' }} onClick={() => newAtRoot('newFile')} />
+          </span>
+          <span title="New folder" style={{ display: 'inline-flex' }}>
+            <FolderPlus size={12} style={{ cursor: 'pointer' }} onClick={() => newAtRoot('newFolder')} />
+          </span>
         </span>
       </div>
       {tree && <Node node={tree} depth={0} onMenu={(e, node) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, node }) }} />}
