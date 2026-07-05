@@ -89,6 +89,8 @@ input, textarea { font: inherit; }
 .modal-hd { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
   border-bottom: 1px solid var(--border); font-weight: 700; }
 .modal-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.prompt-modal input { width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 7px 9px; }
+.prompt-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .settings-row { display: flex; align-items: center; gap: 8px; }
 .settings-row-label { display: flex; align-items: center; gap: 6px; width: 84px; flex: none; font-size: 12px; color: var(--text-dim); }
 .settings-row input, .settings-row select { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 6px;

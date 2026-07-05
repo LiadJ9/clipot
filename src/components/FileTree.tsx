@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown, FileCode, FolderPlus, FilePlus, FolderOpen }
 import type { TreeNode } from '../../electron/shared/ipc'
 import { useStore } from '@/store/store'
 import { joinPath } from '@/lib/path'
+import { promptText } from '@/lib/promptDialog'
 
 const EMPTY_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>'
 
@@ -19,7 +20,7 @@ const DIR_ACTIONS: [MenuAction, string][] = [['newFile', 'New File'], ['newFolde
 
 async function runAction(action: MenuAction, node: TreeNode, refreshTree: () => Promise<void>) {
   if (action === 'rename') {
-    const name = prompt('Rename to', node.name)
+    const name = await promptText('Rename to', node.name)
     if (!name || name === node.name) return
     await window.clipot.rename(node.path, joinPath(dirOf(node.path), name))
   } else if (action === 'duplicate') {
@@ -28,12 +29,12 @@ async function runAction(action: MenuAction, node: TreeNode, refreshTree: () => 
     if (!confirm(`Delete "${node.name}"?`)) return
     await window.clipot.remove(node.path)
   } else if (action === 'newFile') {
-    const name = prompt('New file name', 'untitled.svg')
+    const name = await promptText('New file name', 'untitled.svg')
     if (!name) return
     const fileName = name.toLowerCase().endsWith('.svg') ? name : `${name}.svg`
     await window.clipot.createFile(joinPath(node.path, fileName), EMPTY_SVG)
   } else if (action === 'newFolder') {
-    const name = prompt('New folder name')
+    const name = await promptText('New folder name')
     if (!name) return
     await window.clipot.createDir(joinPath(node.path, name))
   }

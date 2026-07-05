@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Send } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { joinPath } from '@/lib/path'
+import { promptText } from '@/lib/promptDialog'
 import logoUrl from '../../assets/logo.svg'
 
 export default function NewFileView() {
@@ -17,7 +18,7 @@ export default function NewFileView() {
     await sendPrompt(prompt)
     const source = useStore.getState().source
     if (!source) return
-    const name = window.prompt('Filename for the new SVG', 'untitled.svg')
+    const name = await promptText('Filename for the new SVG', 'untitled.svg')
     if (!name) return
     const fileName = name.toLowerCase().endsWith('.svg') ? name : `${name}.svg`
     try {
@@ -37,11 +38,12 @@ export default function NewFileView() {
         <input
           value={text}
           disabled={!folder}
+          data-testid="new-file-input"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void send() }}
           placeholder="Describe the SVG you want to create…"
         />
-        <button disabled={!folder} title="Send" onClick={() => void send()}><Send size={14} /></button>
+        <button disabled={!folder} title="Send" data-testid="new-file-send" onClick={() => void send()}><Send size={14} /></button>
       </div>
       {error && <div className="notice">{error}</div>}
     </div>

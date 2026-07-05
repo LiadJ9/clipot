@@ -1,10 +1,16 @@
 import { test, expect, _electron as electron } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
-import { mkdtempSync, copyFileSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, copyFileSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const MOCK_EDIT = '<<<EDIT\nSEARCH:\nfill="#ccc"\nREPLACE:\nfill="#e8833a"\n>>>\n'
+// A conversational reply with the SVG in a code fence (NO <<<FILE>>> block) — the
+// exact shape a chatty model returns and the user's reported "dog" scenario.
+const MOCK_NEW_FENCED =
+  'Here is a simple illustration of a dog.\n```svg\n' +
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle id="dog" cx="50" cy="50" r="40" fill="#e8833a"/></svg>\n' +
+  '```\n'
 
 test('recolors a selected element via a mocked LLM stream and saves it to disk', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'clipot-e2e-'))
@@ -49,6 +55,49 @@ test('recolors a selected element via a mocked LLM stream and saves it to disk',
     await expect
       .poll(() => readFileSync(housePath, 'utf8'), { timeout: 15_000 })
       .toContain('fill="#e8833a"')
+  } finally {
+    await electronApp?.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('creates a new SVG from a fenced (loose) model reply via the in-app filename dialog', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'clipot-e2e-new-')) // empty folder → new-file screen
+  const mockPath = join(dir, 'mock.txt')
+  writeFileSync(mockPath, MOCK_NEW_FENCED, 'utf8')
+
+  let electronApp: ElectronApplication | null = null
+  try {
+    electronApp = await electron.launch({
+      args: ['.', '--no-sandbox', `--user-data-dir=${join(dir, 'userdata')}`],
+      env: {
+        ...process.env,
+        CLIPOT_MOCK_LLM: mockPath,
+        CLIPOT_TEST_FOLDER: dir,
+        NODE_ENV: 'production',
+        ANTHROPIC_API_KEY: 'test-key-not-used-by-mock',
+      },
+    })
+
+    const window: Page = await electronApp.firstWindow()
+    await window.waitForLoadState('domcontentloaded')
+
+    // Open the (empty) folder → the new-file screen appears.
+    await window.getByTestId('sidebar').getByText('Open folder').click()
+    await window.getByTestId('new-file-input').fill('a dog')
+    await window.getByTestId('new-file-send').click()
+
+    // The in-app filename dialog (Electron has no window.prompt) must appear.
+    const nameInput = window.getByTestId('prompt-modal-input')
+    await expect(nameInput).toBeVisible({ timeout: 15_000 })
+    await nameInput.fill('dog.svg')
+    await window.getByTestId('prompt-modal-ok').click()
+
+    // The file is actually written to disk with the recovered SVG.
+    const dogPath = join(dir, 'dog.svg')
+    await expect
+      .poll(() => (existsSync(dogPath) ? readFileSync(dogPath, 'utf8') : ''), { timeout: 15_000 })
+      .toContain('id="dog"')
   } finally {
     await electronApp?.close()
     rmSync(dir, { recursive: true, force: true })

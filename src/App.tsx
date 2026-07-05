@@ -13,6 +13,7 @@ import PromptBar from './components/PromptBar'
 import ThreadDrawer from './components/ThreadDrawer'
 import SettingsModal from './components/SettingsModal'
 import RulesEditor from './components/RulesEditor'
+import PromptHost from './components/PromptHost'
 import { mainView } from '@/lib/mainView'
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
       <ThreadDrawer />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <RulesEditor open={rulesOpen} onClose={() => setRulesOpen(false)} />
+      <PromptHost />
     </div>
   )
 }

@@ -223,7 +223,9 @@ export const useStore = create<State>((set, get) => ({
   async sendPrompt(prompt) {
     const st = get()
     if (st.streaming) return
-    if (!st.activePath && st.mode !== 'new') return
+    // Proceed when editing an open file OR creating into an open folder (the
+    // new-file screen shows for both mode 'new' and an empty folder in 'edit').
+    if (!st.activePath && !st.folder) return
 
     // Fail fast if the chosen provider has no key (Ollama uses a local host, so
     // it needs none). Avoids a pointless checkpoint + stream + retry cycle and
