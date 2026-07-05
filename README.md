@@ -12,7 +12,13 @@ Everything is local-first: your SVGs live on disk in a folder you choose, edits 
 
 ## Screenshots
 
-> _Screenshots coming soon._
+Create a new SVG from a prompt:
+
+![clipot new-file view — logo art and a prompt box for describing an SVG to create](assets/screenshots/new-file.png)
+
+Edit an existing SVG: click elements to select them, watch edits stream in live, and roll back from the per-file thread and checkpoints:
+
+![clipot editing view — a lemon SVG on the canvas with the thread drawer and checkpoints open](assets/screenshots/editing.png)
 
 ## Features
 
