@@ -217,7 +217,10 @@ function applyCsp() {
 
 app.whenReady().then(() => {
   loadVaultIntoEnv()
-  applyCsp()
+  // CSP is a production hardening control. In dev, Vite serves an inline
+  // react-refresh preamble that script-src 'self' would block, breaking the
+  // renderer; the dev server is a trusted local origin, so skip CSP there.
+  if (!isDev) applyCsp()
   registerIpc()
   createWindow()
 })
