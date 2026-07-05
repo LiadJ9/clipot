@@ -277,6 +277,31 @@ describe('autosave debounce and undo race', () => {
   })
 })
 
+describe('zoom', () => {
+  beforeEach(() => useStore.setState({ zoom: 1 }))
+
+  it('zooms in by a 1.2x step', () => {
+    useStore.getState().zoomIn()
+    expect(useStore.getState().zoom).toBeCloseTo(1.2)
+  })
+
+  it('clamps zoom-in at 4', () => {
+    for (let i = 0; i < 30; i++) useStore.getState().zoomIn()
+    expect(useStore.getState().zoom).toBe(4)
+  })
+
+  it('clamps zoom-out at 0.25', () => {
+    for (let i = 0; i < 30; i++) useStore.getState().zoomOut()
+    expect(useStore.getState().zoom).toBe(0.25)
+  })
+
+  it('reset returns to 1', () => {
+    useStore.getState().zoomIn()
+    useStore.getState().zoomReset()
+    expect(useStore.getState().zoom).toBe(1)
+  })
+})
+
 describe('pathExists', () => {
   const tree: TreeNode = {
     name: 'root', path: '/root', kind: 'dir',
