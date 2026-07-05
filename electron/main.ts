@@ -198,6 +198,8 @@ function createWindow() {
   // initial programmatic loadURL/loadFile below does not trigger will-navigate.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (e) => e.preventDefault())
+  // Scale the whole UI up 20%; re-applied after every (re)load, incl. dev HMR.
+  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(1.2))
   if (isDev) win.loadURL(process.env.VITE_DEV_SERVER_URL!)
   else win.loadFile(join(__dirname, '../dist/index.html'))
 }
