@@ -3,6 +3,7 @@ import { Send } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { joinPath } from '@/lib/path'
 import { promptText } from '@/lib/promptDialog'
+import { sanitizeFilename } from '@/lib/filename'
 import logoUrl from '../../assets/logo.svg'
 
 export default function NewFileView() {
@@ -18,12 +19,15 @@ export default function NewFileView() {
     await sendPrompt(prompt)
     const source = useStore.getState().source
     if (!source) return
-    const name = await promptText('Filename for the new SVG', 'untitled.svg')
+    const suggested = sanitizeFilename(useStore.getState().suggestedName ?? '')
+    const name = await promptText('Filename for the new SVG', suggested)
     if (!name) return
     const fileName = name.toLowerCase().endsWith('.svg') ? name : `${name}.svg`
     try {
       const path = joinPath(folder, fileName)
       await window.clipot.createFile(path, source)
+      // Carry the generating conversation into the new file, then open it.
+      await window.clipot.saveThread(folder, path, useStore.getState().thread)
       await openFile(path)
     } catch {
       setError('Failed to create the new file.')

@@ -103,3 +103,42 @@ test('creates a new SVG from a fenced (loose) model reply via the in-app filenam
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+const MOCK_NEW_NAMED =
+  'Here is a dog.\n<<<FILE dog.svg\n' +
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle id="dog" cx="50" cy="50" r="40" fill="#e8833a"/></svg>\n' +
+  '>>>\n'
+
+test('new file: pre-fills the model filename and migrates the conversation to the file', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'clipot-e2e-name-'))
+  const mockPath = join(dir, 'mock.txt')
+  writeFileSync(mockPath, MOCK_NEW_NAMED, 'utf8')
+
+  let electronApp: ElectronApplication | null = null
+  try {
+    electronApp = await electron.launch({
+      args: ['.', '--no-sandbox', `--user-data-dir=${join(dir, 'userdata')}`],
+      env: { ...process.env, CLIPOT_MOCK_LLM: mockPath, CLIPOT_TEST_FOLDER: dir, NODE_ENV: 'production', ANTHROPIC_API_KEY: 'k' },
+    })
+    const window: Page = await electronApp.firstWindow()
+    await window.waitForLoadState('domcontentloaded')
+
+    await window.getByTestId('sidebar').getByText('Open folder').click()
+    await window.getByTestId('new-file-input').fill('a dog')
+    await window.getByTestId('new-file-send').click()
+
+    const nameInput = window.getByTestId('prompt-modal-input')
+    await expect(nameInput).toBeVisible({ timeout: 15_000 })
+    await expect(nameInput).toHaveValue('dog.svg') // pre-filled from the model
+    await window.getByTestId('prompt-modal-ok').click()
+
+    // Migration: the new file's thread on disk contains the generating prompt.
+    const threadPath = join(dir, '.clipot', 'threads', 'dog.json')
+    await expect
+      .poll(() => (existsSync(threadPath) ? readFileSync(threadPath, 'utf8') : ''), { timeout: 15_000 })
+      .toContain('a dog')
+  } finally {
+    await electronApp?.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
