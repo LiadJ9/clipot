@@ -1,6 +1,6 @@
 export type EditBlock =
   | { kind: 'edit'; search: string; replace: string }
-  | { kind: 'file'; content: string }
+  | { kind: 'file'; content: string; name?: string }
 
 export class IncompleteBlockError extends Error {}
 
@@ -27,9 +27,10 @@ export function createEditParser() {
       if (!m) throw new IncompleteBlockError('Malformed EDIT block')
       return { kind: 'edit', search: m[1], replace: m[2] }
     }
-    const fm = /<<<FILE\s*\n([\s\S]*?)\n?$/.exec(raw)
+    const fm = /<<<FILE[ \t]*([^\n]*)\n([\s\S]*?)\n?$/.exec(raw)
     if (!fm) throw new IncompleteBlockError('Malformed FILE block')
-    return { kind: 'file', content: fm[1] }
+    const name = fm[1].trim()
+    return name ? { kind: 'file', content: fm[2], name } : { kind: 'file', content: fm[2] }
   }
 
   return {

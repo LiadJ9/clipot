@@ -31,4 +31,12 @@ describe('editStream', () => {
     p.push('<<<EDIT\nSEARCH:\nx\nREPLACE:\ny\n')
     expect(() => p.flush()).toThrow(IncompleteBlockError)
   })
+  it('captures a filename on the FILE open line', () => {
+    const blocks = parseAll(['<<<FILE dog.svg\n<svg/>\n>>>'])
+    expect(blocks).toEqual([{ kind: 'file', content: '<svg/>', name: 'dog.svg' }])
+  })
+  it('omits name when the FILE block has none', () => {
+    const blocks = parseAll(['<<<FILE\n<svg/>\n>>>'])
+    expect(blocks).toEqual([{ kind: 'file', content: '<svg/>' }])
+  })
 })
