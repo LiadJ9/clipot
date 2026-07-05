@@ -33,4 +33,7 @@ describe('promptBuilder', () => {
     expect(EDIT_PROTOCOL).toMatch(/never in markdown code fences/i)
     expect(EDIT_PROTOCOL).toContain('<<<FILE')
   })
+  it('protocol asks for a filename on the FILE open line', () => {
+    expect(EDIT_PROTOCOL).toMatch(/<<<FILE your-filename\.svg/)
+  })
 })

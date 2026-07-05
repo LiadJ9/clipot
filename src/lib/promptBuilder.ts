@@ -22,8 +22,9 @@ export const EDIT_PROTOCOL = [
   'SEARCH must match the current file byte-for-byte. Prefer minimal edits.',
   '',
   'To create a brand-new file, reply with EXACTLY ONE block (plus at most a one-line',
-  'explanation) and put the whole document inside it:',
-  '<<<FILE',
+  'explanation). Put a short, descriptive filename after FILE on the opening line, and',
+  'the whole document inside the block:',
+  '<<<FILE your-filename.svg',
   '<the complete <svg>...</svg> document>',
   '>>>',
 ].join('\n')
