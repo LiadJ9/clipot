@@ -53,5 +53,16 @@ const api: ClipotApi = {
   watchFolder: (path) => ipcRenderer.invoke(CH.watchFolder, path),
   loadPrefs: () => ipcRenderer.invoke(CH.loadPrefs),
   savePrefs: (prefs) => ipcRenderer.invoke(CH.savePrefs, prefs),
+  window: {
+    minimize: () => ipcRenderer.send(CH.winMinimize),
+    toggleMaximize: () => ipcRenderer.send(CH.winToggleMaximize),
+    close: () => ipcRenderer.send(CH.winClose),
+    isMaximized: () => ipcRenderer.invoke(CH.winIsMaximized),
+    onMaximizedChange: (cb) => {
+      const h = (_e: IpcRendererEvent, maximized: boolean) => cb(maximized)
+      ipcRenderer.on(CH.winMaximizedChanged, h)
+      return () => ipcRenderer.off(CH.winMaximizedChanged, h)
+    },
+  },
 }
 contextBridge.exposeInMainWorld('clipot', api)

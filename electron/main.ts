@@ -190,12 +190,22 @@ function registerIpc() {
     }
     return CURATED_MODELS[provider] ?? []
   })
+  ipcMain.on(CH.winMinimize, (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
+  ipcMain.on(CH.winToggleMaximize, (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (!w) return
+    if (w.isMaximized()) w.unmaximize()
+    else w.maximize()
+  })
+  ipcMain.on(CH.winClose, (e) => BrowserWindow.fromWebContents(e.sender)?.close())
+  ipcMain.handle(CH.winIsMaximized, (e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false)
 }
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    frame: false,
     backgroundColor: '#0e0b08',
     icon: join(app.getAppPath(), 'assets/icon.png'),
     webPreferences: {
@@ -211,6 +221,8 @@ function createWindow() {
   win.webContents.on('will-navigate', (e) => e.preventDefault())
   // Scale the whole UI up 20%; re-applied after every (re)load, incl. dev HMR.
   win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(1.2))
+  win.on('maximize', () => safeSend(win.webContents, CH.winMaximizedChanged, true))
+  win.on('unmaximize', () => safeSend(win.webContents, CH.winMaximizedChanged, false))
   if (isDev) win.loadURL(process.env.VITE_DEV_SERVER_URL!)
   else win.loadFile(join(__dirname, '../dist/index.html'))
 }
