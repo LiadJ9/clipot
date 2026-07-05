@@ -147,3 +147,37 @@ test('new file: pre-fills the model filename and migrates the conversation to th
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('custom titlebar controls maximize and restore the window', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'clipot-e2e-titlebar-'))
+  let electronApp: ElectronApplication | null = null
+  try {
+    electronApp = await electron.launch({
+      args: ['.', '--no-sandbox', `--user-data-dir=${join(dir, 'userdata')}`],
+      env: { ...process.env, CLIPOT_TEST_FOLDER: dir, NODE_ENV: 'production', ANTHROPIC_API_KEY: 'k' },
+    })
+    const window: Page = await electronApp.firstWindow()
+    await window.waitForLoadState('domcontentloaded')
+
+    // All three custom controls are present in the frameless titlebar.
+    await expect(window.getByTitle('Minimize')).toBeVisible()
+    await expect(window.getByTitle('Close')).toBeVisible()
+    const maxBtn = window.getByTitle('Maximize')
+    await expect(maxBtn).toBeVisible()
+
+    const isMax = () => electronApp!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMaximized())
+
+    await maxBtn.click()
+    await expect.poll(isMax, { timeout: 5_000 }).toBe(true)
+    // The button reflects state: it now offers Restore.
+    const restoreBtn = window.getByTitle('Restore')
+    await expect(restoreBtn).toBeVisible()
+
+    await restoreBtn.click()
+    await expect.poll(isMax, { timeout: 5_000 }).toBe(false)
+    // Do NOT click Close — it would terminate the app before cleanup.
+  } finally {
+    await electronApp?.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
