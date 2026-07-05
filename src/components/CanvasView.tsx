@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import { useStore } from '@/store/store'
 import { ensureId } from '@/lib/svgDoc'
 import { labelFor } from '@/lib/selection'
+import type { Selection } from '@/lib/selection'
 import { resolveClick, stampPaths, rectsIntersect, keepLeafMost, PATH_ATTR, type Rect } from '@/lib/canvasSelect'
 
 type Bubble = { n: number; x: number; y: number }
@@ -133,12 +134,26 @@ async function rasterizeRegion(svgSource: string, dragBox: Rect, root: SVGSVGEle
   }
 }
 
+// Screen positions of the selection bubbles, relative to the wrap's top-left.
+// Reads getScreenCTM, which reflects the current CSS transform (zoom), so callers
+// only need to re-run this whenever zoom or selections change.
+function computeBubbles(root: SVGSVGElement, wrap: HTMLDivElement, selections: Selection[]): Bubble[] {
+  const wrapRect = wrap.getBoundingClientRect()
+  const next: Bubble[] = []
+  for (const s of selections) {
+    const el = root.querySelector(`#${CSS.escape(s.id)}`)
+    const p = el && bboxScreenPoint(root, el)
+    if (p) next.push({ n: s.n, x: p.x - wrapRect.left, y: p.y - wrapRect.top })
+  }
+  return next
+}
+
 function Bubble({ n, x, y }: Bubble) {
   return <span className="sel-bubble" style={{ left: x, top: y }}>{n}</span>
 }
 
 export default function CanvasView() {
-  const { source, selections, addSelection, removeSelection, setSource, regionMode } = useStore()
+  const { source, selections, addSelection, removeSelection, setSource, regionMode, zoom } = useStore()
   const wrapRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<SVGSVGElement | null>(null)
@@ -196,17 +211,7 @@ export default function CanvasView() {
       el.parentNode?.appendChild(el)
     }
 
-    const recomputeBubbles = () => {
-      if (!wrap) { setBubbles([]); return }
-      const wrapRect = wrap.getBoundingClientRect()
-      const next: Bubble[] = []
-      for (const s of selections) {
-        const el = root.querySelector(`#${CSS.escape(s.id)}`)
-        const p = el && bboxScreenPoint(root, el)
-        if (p) next.push({ n: s.n, x: p.x - wrapRect.left, y: p.y - wrapRect.top })
-      }
-      setBubbles(next)
-    }
+    const recomputeBubbles = () => { setBubbles(wrap ? computeBubbles(root, wrap, selections) : []) }
     recomputeBubbles()
     window.addEventListener('resize', recomputeBubbles)
 
@@ -215,6 +220,25 @@ export default function CanvasView() {
       window.removeEventListener('resize', recomputeBubbles)
     }
   }, [source, selections, addSelection, removeSelection, setSource])
+
+  // Zoom rescales the surface, moving every element on screen — re-pin bubbles.
+  useEffect(() => {
+    const root = rootRef.current
+    const wrap = wrapRef.current
+    if (root && wrap) setBubbles(computeBubbles(root, wrap, selections))
+  }, [zoom, selections])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const { zoomIn, zoomOut, zoomReset } = useStore.getState()
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn() }
+      else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut() }
+      else if (e.key === '0') { e.preventDefault(); zoomReset() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Finds every stamped element intersecting the drag rect, ensures each has an id,
   // adds it as a selection, then kicks off (async, best-effort) rasterization of the crop.
@@ -295,7 +319,7 @@ export default function CanvasView() {
 
   return (
     <div className="canvas-wrap" data-testid="canvas" ref={wrapRef} onMouseDown={handleMouseDown}>
-      <div className="surface" ref={hostRef} style={{ padding: 12, maxWidth: '90%', maxHeight: '90%' }} />
+      <div className="surface" ref={hostRef} style={{ padding: 12, maxWidth: '90%', maxHeight: '90%', transform: `scale(${zoom})`, transformOrigin: 'center' }} />
       {bubbles.map((b) => <Bubble key={b.n} {...b} />)}
       {overlay && <div className="region-drag-rect" style={overlay} />}
     </div>
