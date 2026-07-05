@@ -127,6 +127,49 @@ describe('sendPrompt', () => {
   })
 })
 
+describe('sendPrompt fallback (loose SVG)', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>'
+  const newSvg = '<svg xmlns="http://www.w3.org/2000/svg"><circle id="dog" r="5"/></svg>'
+
+  const baseClipot = (startStream: unknown) => ({
+    keyStatus: vi.fn().mockResolvedValue({ anthropic: true, openai: true, gemini: true, ollama: true }),
+    savePrefs: vi.fn().mockResolvedValue(undefined),
+    checkpoint: vi.fn().mockResolvedValue('cp'),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    saveThread: vi.fn().mockResolvedValue(undefined),
+    startStream,
+  })
+
+  it('applies an SVG the model returned in a fenced block (no edit/file markers)', async () => {
+    const reply = 'Here is a simple illustration of a dog.\n```svg\n' + newSvg + '\n```'
+    const startStream = vi.fn((_a, h) => { h.onChunk(reply); h.onDone(); return vi.fn() })
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = baseClipot(startStream)
+    useStore.setState({ folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit', provider: 'anthropic', error: null })
+
+    await useStore.getState().sendPrompt('draw a dog')
+
+    const s = useStore.getState()
+    expect(s.source).toBe(newSvg)
+    expect(s.editCount).toEqual({ done: 1, total: 1 })
+    expect(startStream).toHaveBeenCalledTimes(1) // no retry needed
+    expect(s.error).toBeNull()
+  })
+
+  it('surfaces an error (not a silent no-op) when the reply has no SVG', async () => {
+    const startStream = vi.fn((_a, h) => { h.onChunk('I could not do that.'); h.onDone(); return vi.fn() })
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = baseClipot(startStream)
+    useStore.setState({ folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit', provider: 'anthropic', error: null })
+
+    await useStore.getState().sendPrompt('draw a dog')
+
+    const s = useStore.getState()
+    expect(s.source).toBe(svg) // unchanged
+    expect(startStream).toHaveBeenCalledTimes(3) // 1 + 2 retries
+    expect(s.thread.some((m) => m.error)).toBe(true)
+    expect(s.error).toContain('applicable')
+  })
+})
+
 describe('autosave debounce and undo race', () => {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>'
   const editReply = '<<<EDIT\nSEARCH:\n<rect id="clipot-1"/>\nREPLACE:\n<rect id="clipot-1" fill="blue"/>\n>>>'

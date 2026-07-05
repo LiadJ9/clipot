@@ -6,8 +6,9 @@ import type { ProviderId } from '../../electron/services/llm/types'
 import type { LlmMessage } from '../../electron/services/llm/types'
 import { revalidate } from '@/lib/selection'
 import { buildMessages, DEFAULT_RULES } from '@/lib/promptBuilder'
-import { createEditParser, IncompleteBlockError } from '@/lib/editStream'
+import { createEditParser } from '@/lib/editStream'
 import { applyEdit } from '@/lib/svgDoc'
+import { extractSvg } from '@/lib/svgExtract'
 import { createUndoStack } from '@/lib/undoStack'
 
 // Module-level undo stack, rebound whenever the active document changes.
@@ -273,7 +274,7 @@ export const useStore = create<State>((set, get) => ({
 
       const parser = createEditParser()
       let assistantText = ''
-      let failure: { detail: string } | null = null
+      let appliedCount = 0
       let streamError: string | null = null
 
       await new Promise<void>((resolve) => {
@@ -287,7 +288,6 @@ export const useStore = create<State>((set, get) => ({
               try {
                 blocks = parser.push(t)
               } catch {
-                failure = { detail: 'Malformed edit block' }
                 return
               }
               for (const b of blocks) {
@@ -304,8 +304,7 @@ export const useStore = create<State>((set, get) => ({
                   const ap = get().activePath
                   if (ap) debouncedWrite(ap, r.source, set)
                   get().revalidateSelections()
-                } else {
-                  failure = { detail: r.detail }
+                  appliedCount++
                 }
               }
             },
@@ -321,14 +320,34 @@ export const useStore = create<State>((set, get) => ({
 
       try {
         parser.flush()
-      } catch (e) {
-        if (e instanceof IncompleteBlockError) failure = { detail: 'Incomplete edit block' }
+      } catch {}
+
+      // Fallback: the model produced no applicable blocks and no provider error,
+      // but may have returned an SVG in prose/a code fence. Recover and apply it
+      // as a whole-document result (validated by applyEdit's FILE path).
+      if (appliedCount === 0 && !streamError) {
+        const svg = extractSvg(assistantText)
+        if (svg) {
+          const r = applyEdit(get().source, { kind: 'file', content: svg })
+          if (r.ok) {
+            undo.push(r.source)
+            set((s) => ({
+              source: r.source,
+              editCount: { done: (s.editCount?.done ?? 0) + 1, total: (s.editCount?.total ?? 0) + 1 },
+            }))
+            const ap = get().activePath
+            if (ap) debouncedWrite(ap, r.source, set)
+            get().revalidateSelections()
+            appliedCount++
+          }
+        }
       }
+
       if (assistantText.trim()) {
         set((s) => ({ thread: [...s.thread, { role: 'assistant', content: assistantText }] }))
       }
       if (streamError) return { kind: 'error', message: streamError }
-      return failure ? { kind: 'retry' } : { kind: 'ok' }
+      return appliedCount > 0 ? { kind: 'ok' } : { kind: 'retry' }
     }
 
     let result = await attempt()
@@ -336,7 +355,7 @@ export const useStore = create<State>((set, get) => ({
     // auth, network) won't be fixed by retrying, so it exits the loop at once.
     for (let i = 0; i < 2 && result.kind === 'retry'; i++) {
       result = await attempt(
-        'The previous edit could not be applied (SEARCH text did not match or produced invalid SVG). Re-read the current file and try again.',
+        'Your previous reply applied no change. Return SVG ONLY inside a <<<FILE>>> block (for a new document) or <<<EDIT>>> blocks (to modify) — never in prose or code fences.',
       )
     }
     if (result.kind === 'error') {
@@ -356,7 +375,12 @@ export const useStore = create<State>((set, get) => ({
       }))
     } else if (result.kind === 'retry') {
       set((s) => ({
-        thread: [...s.thread, { role: 'assistant', content: 'Could not apply the requested change after 2 retries.' }],
+        thread: [
+          ...s.thread,
+          { role: 'assistant', content: "The model didn't return an SVG in an applicable format. Try rephrasing your request.", error: true },
+        ],
+        error: "The model didn't return an SVG in an applicable format — see the message log.",
+        threadOpen: true,
       }))
     }
 
