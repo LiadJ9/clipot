@@ -55,6 +55,11 @@ test('recolors a selected element via a mocked LLM stream and saves it to disk',
     await expect
       .poll(() => readFileSync(housePath, 'utf8'), { timeout: 15_000 })
       .toContain('fill="#e8833a"')
+
+    // Prompt history: ArrowUp recalls the last sent prompt.
+    const input = window.locator('[data-testid="prompt-input"]')
+    await input.press('ArrowUp')
+    await expect(input).toHaveValue('recolor @1')
   } finally {
     await electronApp?.close()
     rmSync(dir, { recursive: true, force: true })

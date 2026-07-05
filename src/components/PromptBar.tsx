@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Send, Square, ChevronDown } from 'lucide-react'
 import { useStore } from '@/store/store'
+import { promptHistory, navigateHistory } from '@/lib/promptHistory'
 import type { ProviderId } from '../../electron/shared/ipc'
 
 const PROVIDERS: ProviderId[] = ['anthropic', 'openai', 'gemini', 'ollama']
@@ -67,13 +68,18 @@ function ModelPicker() {
 }
 
 export default function PromptBar() {
-  const { selections, removeSelection, streaming, sendPrompt, stopStream } = useStore()
+  const { selections, removeSelection, streaming, sendPrompt, stopStream, thread, activePath } = useStore()
   const [text, setText] = useState('')
+  const [histIndex, setHistIndex] = useState<number | null>(null)
+  const [savedDraft, setSavedDraft] = useState('')
+  useEffect(() => { setHistIndex(null); setSavedDraft('') }, [activePath])
 
   const send = () => {
     const prompt = text.trim()
     if (!prompt || streaming) return
     setText('')
+    setHistIndex(null)
+    setSavedDraft('')
     void sendPrompt(prompt)
   }
 
@@ -89,7 +95,18 @@ export default function PromptBar() {
         data-testid="prompt-input"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') send() }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { send(); return }
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+          const hist = promptHistory(thread)
+          if (hist.length === 0) return
+          e.preventDefault()
+          const draft = histIndex === null ? text : savedDraft
+          if (histIndex === null && e.key === 'ArrowUp') setSavedDraft(text)
+          const res = navigateHistory(hist, histIndex, draft, e.key === 'ArrowUp' ? 'up' : 'down')
+          setHistIndex(res.index)
+          setText(res.text)
+        }}
         placeholder="Describe the change…"
         style={{
           flex: 1, background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6,
