@@ -28,4 +28,9 @@ describe('promptBuilder', () => {
     const msgs = buildMessages({ source: S, prompt: 'now', selections: [], rules: '', history })
     expect(msgs.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user'])
   })
+  it('protocol forbids fenced/prose SVG and mandates the FILE block for new files', () => {
+    expect(EDIT_PROTOCOL).toMatch(/only inside the blocks/i)
+    expect(EDIT_PROTOCOL).toMatch(/never in markdown code fences/i)
+    expect(EDIT_PROTOCOL).toContain('<<<FILE')
+  })
 })

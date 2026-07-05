@@ -8,7 +8,10 @@ export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: stri
 export const SIZE_CAP = 32 * 1024
 
 export const EDIT_PROTOCOL = [
-  'You edit SVG files. Reply with a short explanation plus edit blocks.',
+  'You edit and create SVG files. A reply may include a short one-line explanation,',
+  'but ALL SVG you produce MUST appear ONLY inside the blocks below — never in prose,',
+  'never in markdown code fences (no ``` fences), never as a bare tag outside a block.',
+  '',
   'To change an existing file, emit one or more blocks of exactly this form:',
   '<<<EDIT',
   'SEARCH:',
@@ -17,7 +20,9 @@ export const EDIT_PROTOCOL = [
   '<replacement text>',
   '>>>',
   'SEARCH must match the current file byte-for-byte. Prefer minimal edits.',
-  'To create a brand-new file, emit a single block:',
+  '',
+  'To create a brand-new file, reply with EXACTLY ONE block (plus at most a one-line',
+  'explanation) and put the whole document inside it:',
   '<<<FILE',
   '<the complete <svg>...</svg> document>',
   '>>>',
