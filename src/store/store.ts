@@ -97,6 +97,7 @@ type State = {
   folder: string | null; tree: TreeNode | null; activePath: string | null
   source: string; selections: Selection[]; thread: ChatMessage[]
   streaming: boolean; activity: string; editCount: { done: number; total: number } | null
+  suggestedName: string | null
   provider: ProviderId; model: string; rules: string; mode: 'edit' | 'new'
   regionImage?: string | null; regionIds?: string[]
   regionMode: boolean; threadOpen: boolean
@@ -135,7 +136,7 @@ export function pathExists(node: TreeNode | null, path: string): boolean {
 export const useStore = create<State>((set, get) => ({
   folder: null, tree: null, activePath: null,
   source: '', selections: [], thread: [],
-  streaming: false, activity: '', editCount: null,
+  streaming: false, activity: '', editCount: null, suggestedName: null,
   provider: 'anthropic', model: 'claude-sonnet-5', rules: '', mode: 'edit',
   regionImage: null, regionIds: [], regionMode: false, threadOpen: false, error: null, _stop: null,
 
@@ -255,7 +256,7 @@ export const useStore = create<State>((set, get) => ({
     }
 
     const baseThread: ChatMessage[] = [...priorThread, { role: 'user', content: prompt }]
-    set({ streaming: true, activity: '', thread: baseThread, editCount: { done: 0, total: 0 }, error: null })
+    set({ streaming: true, activity: '', thread: baseThread, editCount: { done: 0, total: 0 }, error: null, suggestedName: null })
 
     type AttemptResult = { kind: 'ok' } | { kind: 'retry' } | { kind: 'error'; message: string }
     const attempt = async (extraNote?: string): Promise<AttemptResult> => {
@@ -307,6 +308,7 @@ export const useStore = create<State>((set, get) => ({
                   if (ap) debouncedWrite(ap, r.source, set)
                   get().revalidateSelections()
                   appliedCount++
+                  if (b.kind === 'file' && b.name) set({ suggestedName: b.name })
                 }
               }
             },

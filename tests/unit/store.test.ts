@@ -127,6 +127,36 @@ describe('sendPrompt', () => {
   })
 })
 
+describe('sendPrompt suggestedName', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>'
+  const clipot = (startStream: unknown) => ({
+    keyStatus: vi.fn().mockResolvedValue({ anthropic: true, openai: true, gemini: true, ollama: true }),
+    savePrefs: vi.fn().mockResolvedValue(undefined),
+    checkpoint: vi.fn().mockResolvedValue('cp'),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    saveThread: vi.fn().mockResolvedValue(undefined),
+    startStream,
+  })
+
+  it('captures the filename from a named FILE block', async () => {
+    const reply = '<<<FILE dog.svg\n' + svg + '\n>>>'
+    const startStream = vi.fn((_a, h) => { h.onChunk(reply); h.onDone(); return vi.fn() })
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = clipot(startStream)
+    useStore.setState({ folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit', provider: 'anthropic', suggestedName: null })
+    await useStore.getState().sendPrompt('make a dog')
+    expect(useStore.getState().suggestedName).toBe('dog.svg')
+  })
+
+  it('leaves suggestedName null when the reply has no filename', async () => {
+    const reply = 'Here you go\n```svg\n' + svg + '\n```'
+    const startStream = vi.fn((_a, h) => { h.onChunk(reply); h.onDone(); return vi.fn() })
+    ;(globalThis as unknown as { window: { clipot: unknown } }).window.clipot = clipot(startStream)
+    useStore.setState({ folder: '/f', activePath: '/f/a.svg', source: svg, thread: [], mode: 'edit', provider: 'anthropic', suggestedName: 'stale.svg' })
+    await useStore.getState().sendPrompt('make a dog')
+    expect(useStore.getState().suggestedName).toBeNull()
+  })
+})
+
 describe('sendPrompt fallback (loose SVG)', () => {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="clipot-1"/></svg>'
   const newSvg = '<svg xmlns="http://www.w3.org/2000/svg"><circle id="dog" r="5"/></svg>'
