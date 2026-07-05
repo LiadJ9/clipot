@@ -34,7 +34,8 @@ test('recolors a selected element via a mocked LLM stream and saves it to disk',
     const window: Page = await electronApp.firstWindow()
     await window.waitForLoadState('domcontentloaded')
 
-    await window.getByText('Open folder').click()
+    // Scope to the sidebar: the no-folder placeholder also has an "Open folder" button.
+    await window.getByTestId('sidebar').getByText('Open folder').click()
     await window.getByText('house.svg').click()
 
     const rect = window.locator('.surface rect').first()
