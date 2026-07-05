@@ -5,17 +5,17 @@ export default function ActivityStrip() {
   const { streaming, activity, editCount, threadOpen, toggleThread, error, clearError } = useStore()
 
   return (
-    <div data-testid="activity-strip" style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border)' }}>
+    <div data-testid="activity-strip" style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border)', minWidth: 0 }}>
       {error && (
         <div className="notice">
           <span>{error}</span>
           <X size={12} style={{ cursor: 'pointer' }} onClick={clearError} />
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', minHeight: 24, background: '#140f09' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', minHeight: 24, background: '#140f09', minWidth: 0 }}>
         {streaming && <span className="pulse-dot" />}
         <span style={{
-          flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
           color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 11,
         }}>
           {streaming ? activity : ''}

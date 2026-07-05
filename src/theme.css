@@ -31,7 +31,7 @@ input, textarea { font: inherit; }
 .titlebar .name { font-weight: 700; letter-spacing: .4px; }
 .body { display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
 .sidebar { background: var(--panel); border-right: 1px solid var(--border); overflow: auto; }
-.main { display: grid; grid-template-rows: auto 1fr auto auto; min-height: 0; }
+.main { display: grid; grid-template-rows: auto 1fr auto auto; min-height: 0; min-width: 0; }
 .canvas-wrap { background: var(--canvas-bg); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .surface { background: #fff; border-radius: 6px; box-shadow: 0 4px 18px rgba(0,0,0,.55); }
 .sel-bubble { position: absolute; transform: translate(-50%, -50%); background: var(--accent); color: var(--bg);
