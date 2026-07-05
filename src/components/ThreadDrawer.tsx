@@ -1,19 +1,9 @@
 import { useEffect, useState } from 'react'
 import { X, Check, RotateCcw } from 'lucide-react'
 import { useStore } from '@/store/store'
+import { displayText, countEdits } from '@/lib/threadDisplay'
 
 type Checkpoint = { path: string; label: string }
-
-function countEdits(content: string): number {
-  const m = content.match(/<<<(EDIT|FILE)/g)
-  return m ? m.length : 0
-}
-
-// Strip raw edit-block markup for display, keeping any surrounding explanation text.
-function displayText(content: string): string {
-  const stripped = content.replace(/<<<EDIT[\s\S]*?>>>/g, '').replace(/<<<FILE[\s\S]*?>>>/g, '').trim()
-  return stripped || '(edit applied)'
-}
 
 export default function ThreadDrawer() {
   const { threadOpen, toggleThread, thread, folder, activePath } = useStore()
